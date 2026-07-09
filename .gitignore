@@ -1,0 +1,10 @@
+﻿__pycache__/
+*.py[cod]
+*$py.class
+*.log
+TELEGRAM BOT.LOG
+.env
+venv/
+.vscode/
+AGENTS.md
+agents-guidelines/
