@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import random
 
 from Script import script
