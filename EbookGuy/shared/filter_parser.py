@@ -1,8 +1,14 @@
+import ast
 import re
 
 from pyrogram.types import InlineKeyboardButton
 
 BTN_URL_REGEX = re.compile(r"(\[([^\[]+?)\]\((buttonurl|buttonalert):(?:/{0,2})(.+?)(:same)?\))")
+
+
+def parse_stored_buttons(buttons):
+    """Parse stored inline keyboard button data without executing code."""
+    return ast.literal_eval(buttons)
 
 
 def gfilterparser(text, keyword):
