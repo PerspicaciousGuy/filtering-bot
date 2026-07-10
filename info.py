@@ -5,6 +5,20 @@ from Script import script
 id_pattern = re.compile(r'^.\d+$')
 
 
+def parse_env_bool(name: str, default: bool = False) -> bool:
+    """Parse boolean environment flags from common string values."""
+    value = environ.get(name)
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off", ""}:
+        return False
+    return default
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🤖 SECTION 1: BOT CREDENTIALS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -73,10 +87,10 @@ DELETE_CHANNELS = [int(dch) if id_pattern.search(dch) else dch for dch in enviro
 
 # True = Request-to-join mode (user sends join request, admin approves)
 # False = Normal mode (user must join channel directly)
-REQUEST_TO_JOIN_MODE = bool(environ.get('REQUEST_TO_JOIN_MODE', False))
+REQUEST_TO_JOIN_MODE = parse_env_bool('REQUEST_TO_JOIN_MODE')
 
 # Show "Try Again" button after joining (only for request-to-join mode)
-TRY_AGAIN_BTN = bool(environ.get('TRY_AGAIN_BTN', False))
+TRY_AGAIN_BTN = parse_env_bool('TRY_AGAIN_BTN')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -88,7 +102,7 @@ DATABASE_NAME = environ.get('DATABASE_NAME', "booksnew") # Database name
 COLLECTION_NAME = environ.get('COLLECTION_NAME', 'ebookguy')  # Collection for files
 
 # Multiple Database Support (for large file collections)
-MULTIPLE_DATABASE = bool(environ.get('MULTIPLE_DATABASE', False))
+MULTIPLE_DATABASE = parse_env_bool('MULTIPLE_DATABASE')
 
 # Only needed if MULTIPLE_DATABASE = True
 O_DB_URI = environ.get('O_DB_URI', "")    # Other data (users, settings)
@@ -163,22 +177,22 @@ BINANCE_PAY_ID = environ.get('BINANCE_PAY_ID', '')                   # Binance P
 # ⚙️ SECTION 8: FEATURE TOGGLES (True/False)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PM_SEARCH = bool(environ.get('PM_SEARCH', True))           # Allow search in private messages
-AUTO_FFILTER = bool(environ.get('AUTO_FFILTER', True))     # Auto-filter in groups
-AUTO_DELETE = bool(environ.get('AUTO_DELETE', True))       # Auto-delete search results after 5 min
-BUTTON_MODE = bool(environ.get('BUTTON_MODE', False))      # Show files as buttons (False = text-link list, True = inline buttons)
-MAX_BTN = bool(environ.get('MAX_BTN', True))               # Limit buttons per page
+PM_SEARCH = parse_env_bool('PM_SEARCH', True)           # Allow search in private messages
+AUTO_FFILTER = parse_env_bool('AUTO_FFILTER', True)     # Auto-filter in groups
+AUTO_DELETE = parse_env_bool('AUTO_DELETE', True)       # Auto-delete search results after 5 min
+BUTTON_MODE = parse_env_bool('BUTTON_MODE')             # Show files as buttons (False = text-link list, True = inline buttons)
+MAX_BTN = parse_env_bool('MAX_BTN', True)               # Limit buttons per page
 
-MELCOW_NEW_USERS = bool(environ.get('MELCOW_NEW_USERS', True))    # Welcome new users in groups
-PROTECT_CONTENT = bool(environ.get('PROTECT_CONTENT', False))     # Disable forwarding bot messages
-PUBLIC_FILE_STORE = bool(environ.get('PUBLIC_FILE_STORE', False)) # Anyone can use file store
-NO_RESULTS_MSG = bool(environ.get("NO_RESULTS_MSG", True))        # Show "no results" message
-USE_CAPTION_FILTER = bool(environ.get('USE_CAPTION_FILTER', True)) # Search in file captions too
+MELCOW_NEW_USERS = parse_env_bool('MELCOW_NEW_USERS', True)    # Welcome new users in groups
+PROTECT_CONTENT = parse_env_bool('PROTECT_CONTENT')            # Disable forwarding bot messages
+PUBLIC_FILE_STORE = parse_env_bool('PUBLIC_FILE_STORE')        # Anyone can use file store
+NO_RESULTS_MSG = parse_env_bool("NO_RESULTS_MSG", True)        # Show "no results" message
+USE_CAPTION_FILTER = parse_env_bool('USE_CAPTION_FILTER', True) # Search in file captions too
 
 
 
 # Indexing Settings
-FILTER_BY_EXTENSION = bool(environ.get('FILTER_BY_EXTENSION', True))  # Only index ebooks/audiobooks
+FILTER_BY_EXTENSION = parse_env_bool('FILTER_BY_EXTENSION', True)  # Only index ebooks/audiobooks
 EBOOK_EXTENSIONS = environ.get('EBOOK_EXTENSIONS', 'epub pdf mobi azw azw3 djvu').split()
 AUDIOBOOK_EXTENSIONS = environ.get('AUDIOBOOK_EXTENSIONS', 'mp3 m4a m4b zip rar 7z').split()
 ALLOWED_EXTENSIONS = EBOOK_EXTENSIONS + AUDIOBOOK_EXTENSIONS
