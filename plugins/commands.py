@@ -1,7 +1,7 @@
 from pyrogram import Client, filters
 
 from info import ADMINS
-from plugins.commands_admin import (
+from EbookGuy.features.admin.commands import (
     handle_channel_info,
     handle_delete,
     handle_delete_all_index,
@@ -12,7 +12,7 @@ from plugins.commands_admin import (
     handle_stats,
     handle_stop_button,
 )
-from plugins.commands_conversion import (
+from EbookGuy.features.downloads.conversion import (
     handle_convert_back_callback,
     handle_convert_menu_callback,
     handle_do_convert_callback,
@@ -21,7 +21,7 @@ from plugins.commands_downloads import (
     handle_download_book_callback,
     handle_start,
 )
-from plugins.commands_requests import handle_requests
+from EbookGuy.features.requests.commands import handle_requests
 
 
 @Client.on_message(filters.command("start") & filters.incoming & filters.private)

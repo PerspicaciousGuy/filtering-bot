@@ -4,20 +4,20 @@ from pyrogram import Client, filters
 from pyrogram.types import PreCheckoutQuery
 
 from info import ADMINS
-from plugins.premium_admin import (
+from EbookGuy.features.premium.admin import (
     handle_add_premium_command,
     handle_premium_users_command,
     handle_remove_premium_command,
     handle_stars_balance_command,
     handle_stars_history_command,
 )
-from plugins.premium_payments import (
+from EbookGuy.features.premium.payments import (
     handle_buy_premium_callback,
     handle_confirm_premium_callback,
     handle_pre_checkout_handler,
     handle_successful_payment_handler,
 )
-from plugins.premium_views import (
+from EbookGuy.features.premium.views import (
     handle_my_status_command,
     handle_premium_command,
     handle_show_premium_callback,

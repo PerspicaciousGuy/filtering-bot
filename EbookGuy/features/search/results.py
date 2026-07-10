@@ -12,7 +12,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from Script import script
 from database.ia_filterdb import get_search_results
 from info import BUTTON_MODE, CUSTOM_FILE_CAPTION, MAX_B_TN
-from plugins.pm_filter_search_state import FRESH, PENDING_SEARCH
+from EbookGuy.features.search.state import FRESH, PENDING_SEARCH
 from utils import get_cap, get_settings, get_size, temp
 
 logger = logging.getLogger(__name__)

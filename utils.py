@@ -1,11 +1,11 @@
-from utils_broadcast import broadcast_messages, broadcast_messages_group
-from utils_delivery import send_all
-from utils_filter_parser import BTN_URL_REGEX, gfilterparser, parser
-from utils_formatting import get_cap, get_size, last_online, list_to_str, split_list
-from utils_message import extract_user, get_file_id, is_admin_or_owner
-from utils_settings import get_settings, save_group_settings
-from utils_state import temp
-from utils_subscriptions import is_subscribed, pub_is_subscribed
+from EbookGuy.shared.broadcast import broadcast_messages, broadcast_messages_group
+from EbookGuy.shared.delivery import send_all
+from EbookGuy.shared.filter_parser import BTN_URL_REGEX, gfilterparser, parser
+from EbookGuy.shared.formatting import get_cap, get_size, last_online, list_to_str, split_list
+from EbookGuy.shared.message import extract_user, get_file_id, is_admin_or_owner
+from EbookGuy.shared.settings import get_settings, save_group_settings
+from EbookGuy.shared.state import temp
+from EbookGuy.shared.subscriptions import is_subscribed, pub_is_subscribed
 
 __all__ = [
     "BTN_URL_REGEX",

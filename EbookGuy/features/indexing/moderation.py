@@ -1,7 +1,7 @@
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from info import ADMINS
-from plugins.index_worker import index_files_to_db, lock
+from EbookGuy.features.indexing.worker import index_files_to_db, lock
 from utils import temp
 
 async def handle_index_files(bot, query):

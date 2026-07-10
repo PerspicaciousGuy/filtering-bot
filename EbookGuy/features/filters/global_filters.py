@@ -5,7 +5,7 @@ from pyrogram.types import InlineKeyboardMarkup
 
 from database.connections_mdb import active_connection
 from info import *
-from plugins.pm_filter_search import auto_filter
+from EbookGuy.features.search.results import auto_filter
 from utils import get_settings
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger.setLevel(logging.ERROR)
 
 
 from database.gfilters_mdb import find_gfilter, get_gfilters
-from plugins.pm_filter_manual_filters import manual_filters
+from EbookGuy.features.filters.manual import manual_filters
 
 
 async def global_filters(client, message, text=False):

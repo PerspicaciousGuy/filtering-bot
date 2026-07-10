@@ -8,7 +8,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.ia_filterdb import get_file_details
 from database.users_chats_db import db
 from info import *
-from plugins.commands_download_limits import (
+from EbookGuy.features.downloads.limits import (
     check_and_increment_download,
     send_auto_delete_message,
 )

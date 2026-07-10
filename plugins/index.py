@@ -1,14 +1,14 @@
 from pyrogram import Client, filters
 
 from info import ADMINS
-from plugins.index_admin import (
+from EbookGuy.features.indexing.admin import (
     handle_delete_checkpoint_callback,
     handle_resume_callback,
     handle_resume_indexing,
     handle_set_skip_number,
 )
-from plugins.index_moderation import handle_index_files
-from plugins.index_requests import handle_send_for_index
+from EbookGuy.features.indexing.moderation import handle_index_files
+from EbookGuy.features.indexing.requests import handle_send_for_index
 
 
 @Client.on_callback_query(filters.regex(r'^index'))

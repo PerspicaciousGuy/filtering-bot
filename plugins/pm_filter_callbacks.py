@@ -1,14 +1,14 @@
 from pyrogram import Client
 from pyrogram.types import CallbackQuery
 
-from plugins.pm_filter_alert_callbacks import maybe_handle_alert_callback
-from plugins.pm_filter_connection_callbacks import maybe_handle_connection_callback
-from plugins.pm_filter_file_callbacks import maybe_handle_file_callback
-from plugins.pm_filter_filter_management_callbacks import (
+from EbookGuy.features.filters.alert_callbacks import maybe_handle_alert_callback
+from EbookGuy.features.filters.connection_callbacks import maybe_handle_connection_callback
+from EbookGuy.features.filters.file_callbacks import maybe_handle_file_callback
+from EbookGuy.features.filters.management_callbacks import (
     maybe_handle_filter_management_callback,
 )
-from plugins.pm_filter_premium_callbacks import maybe_handle_premium_callback
-from plugins.pm_filter_request_status_callbacks import (
+from EbookGuy.features.filters.premium_callbacks import maybe_handle_premium_callback
+from EbookGuy.features.filters.request_status_callbacks import (
     maybe_handle_request_status_callback,
 )
 

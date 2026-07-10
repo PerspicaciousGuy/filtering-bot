@@ -2,7 +2,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import delete_checkpoint, get_all_checkpoints, get_checkpoint
 from info import ADMINS
-from plugins.index_worker import index_files_to_db, lock
+from EbookGuy.features.indexing.worker import index_files_to_db, lock
 from utils import temp
 
 async def handle_set_skip_number(bot, message):

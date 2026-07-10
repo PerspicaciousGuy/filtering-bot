@@ -5,7 +5,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import get_file_details
 from info import CUSTOM_FILE_CAPTION, FREE_DAILY_LIMIT, PREMIUM_DAILY_LIMIT
-from plugins.commands_download_limits import check_and_increment_download
+from EbookGuy.features.downloads.limits import check_and_increment_download
 from utils import get_size
 
 

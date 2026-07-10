@@ -1,7 +1,7 @@
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from plugins.pm_filter_search_results import auto_filter
-from plugins.pm_filter_search_state import MockMessage, PENDING_SEARCH
+from EbookGuy.features.search.results import auto_filter
+from EbookGuy.features.search.state import MockMessage, PENDING_SEARCH
 
 
 async def show_format_selection(message, query_text):

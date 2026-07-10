@@ -1,7 +1,7 @@
 from pyrogram import enums
 
 from info import MAX_LIST_ELM
-from utils_state import temp
+from EbookGuy.shared.state import temp
 
 
 def get_size(size):
