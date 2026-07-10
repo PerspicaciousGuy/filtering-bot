@@ -31,9 +31,9 @@ async def grp_bd(bot, message):
         InlineKeyboardButton('Support', url=f'https://t.me/{SUPPORT_CHAT}')
     ]]
     reply_markup=InlineKeyboardMarkup(buttons)
-    vazha = await db.get_chat(message.chat.id)
+    disabled_chat_record = await db.get_chat(message.chat.id)
     k = await message.reply(
-        text=f"CHAT NOT ALLOWED 🐞\n\nMy admins has restricted me from working here ! If you want to know more about it contact support..\nReason : <code>{vazha['reason']}</code>.",
+        text=f"CHAT NOT ALLOWED 🐞\n\nMy admins has restricted me from working here ! If you want to know more about it contact support..\nReason : <code>{disabled_chat_record['reason']}</code>.",
         reply_markup=reply_markup)
     try:
         await k.pin()
