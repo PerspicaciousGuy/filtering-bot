@@ -13,7 +13,7 @@ from Script import script
 from database.ia_filterdb import get_search_results
 from info import BUTTON_MODE, CUSTOM_FILE_CAPTION, MAX_B_TN
 from EbookGuy.features.search.state import FRESH, PENDING_SEARCH
-from utils import get_cap, get_settings, get_size, temp
+from utils import get_cap, get_settings, get_size, save_group_settings, temp
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -269,15 +269,15 @@ async def auto_filter(client, name, msg, reply_msg, ai_search, format_type=None)
         for file in files:
             cap += f"<b>📁 <a href='https://telegram.me/{temp.U_NAME}?start={pre}_{file['file_id']}'>[{get_size(file['file_size'])}] {' '.join(filter(lambda x: not x.startswith('[') and not x.startswith('@') and not x.startswith('www.'), file['file_name'].split()))}\n\n</a></b>"
 
-    fuk = await reply_msg.edit_text(text=cap, reply_markup=InlineKeyboardMarkup(btn), disable_web_page_preview=True)
+    search_results_message = await reply_msg.edit_text(text=cap, reply_markup=InlineKeyboardMarkup(btn), disable_web_page_preview=True)
     
     try:
         if settings['auto_delete']:
             await asyncio.sleep(300)
-            await fuk.delete()
+            await search_results_message.delete()
             await message.delete()
     except KeyError:
         await save_group_settings(message.chat.id, 'auto_delete', True)
         await asyncio.sleep(300)
-        await fuk.delete()
+        await search_results_message.delete()
         await message.delete()
