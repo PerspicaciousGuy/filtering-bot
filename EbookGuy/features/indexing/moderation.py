@@ -8,8 +8,8 @@ async def handle_index_files(bot, query):
     if query.data.startswith('index_cancel'):
         temp.CANCEL = True
         return await query.answer("Cancelling Indexing... Progress will be saved.")
-    _, raju, chat, lst_msg_id, from_user = query.data.split("#")
-    if raju == 'reject':
+    _, moderation_action, chat, lst_msg_id, from_user = query.data.split("#")
+    if moderation_action == 'reject':
         await query.message.delete()
         await bot.send_message(
             int(from_user),
