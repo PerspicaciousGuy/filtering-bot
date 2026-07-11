@@ -27,5 +27,5 @@ async def send_all(bot, userid, files, ident, chat_id, user_name, query):
         await query.answer('Unblock the bot mahn !', show_alert=True)
     except PeerIdInvalid:
         await query.answer('Hey, Start Bot First And Click Send All', show_alert=True)
-    except Exception as e:
+    except Exception:
         await query.answer('Hey, Start Bot First And Click Send All', show_alert=True)
