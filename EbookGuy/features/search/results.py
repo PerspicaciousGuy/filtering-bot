@@ -26,7 +26,7 @@ async def handle_next_page(bot, query):
         return await query.answer(script.ALRT_TXT.format(query.from_user.first_name), show_alert=True)
     try:
         offset = int(offset)
-    except Exception:
+    except (TypeError, ValueError):
         offset = 0
     
     # FRESH now stores dict with 'query' and 'format_type'
@@ -46,7 +46,7 @@ async def handle_next_page(bot, query):
     files, n_offset, total = await get_search_results(query.message.chat.id, search, offset=offset, filter=True, format_type=format_type)
     try:
         n_offset = int(n_offset)
-    except Exception:
+    except (TypeError, ValueError):
         n_offset = 0
 
     if not files:
@@ -140,14 +140,14 @@ async def handle_next_page(bot, query):
         try:
             await query.message.edit_text(text=cap, reply_markup=InlineKeyboardMarkup(btn), disable_web_page_preview=True)
         except MessageNotModified:
-            pass
+            logger.debug("Search results message is already current")
     else:
         try:
             await query.edit_message_reply_markup(
                 reply_markup=InlineKeyboardMarkup(btn)
             )
         except MessageNotModified:
-            pass
+            logger.debug("Search results message is already current")
     await query.answer()
 
 
