@@ -81,13 +81,11 @@ async def deletemultiplemedia(bot, message):
         
         try:
             await message.reply_text(reply_text)
-        except Exception as e:
-            print(f"[files_delete.py] Error sending reply: {e}")
+        except Exception:
+            logger.exception("Failed to send file deletion reply")
 
-    except Exception as e:
-        print(f"[files_delete.py] ERROR in delete handler: {e}")
-        import traceback
-        traceback.print_exc()
+    except Exception:
+        logger.exception("File deletion handler failed")
 
 
 @Client.on_message(filters.command("duplicates") & filters.user(ADMINS))
@@ -135,9 +133,9 @@ async def find_duplicates(bot, message):
         
         await status_msg.edit_text(report, reply_markup=InlineKeyboardMarkup(btn))
         
-    except Exception as e:
-        logger.error(f"Error finding duplicates: {e}")
-        await status_msg.edit_text(f"❌ <b>Error scanning duplicates:</b>\n\n<code>{str(e)}</code>")
+    except Exception:
+        logger.exception("Failed to find duplicate files")
+        await status_msg.edit_text("<b>Error scanning duplicates.</b> Please try again later.")
 
 
 @Client.on_callback_query(filters.regex(r"^clean_duplicates"))
@@ -180,6 +178,6 @@ async def clean_duplicates(bot, query):
         )
         logger.info(f"Cleaned {total_removed} duplicate files")
         
-    except Exception as e:
-        logger.error(f"Error cleaning duplicates: {e}")
-        await query.message.edit_text(f"❌ <b>Error cleaning duplicates:</b>\n\n<code>{str(e)}</code>")
+    except Exception:
+        logger.exception("Failed to clean duplicate files")
+        await query.message.edit_text("<b>Error cleaning duplicates.</b> Please try again later.")
