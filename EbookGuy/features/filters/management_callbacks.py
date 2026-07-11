@@ -1,4 +1,7 @@
+import logging
+
 from pyrogram import enums
+from pyrogram.errors import RPCError
 
 from database.connections_mdb import active_connection
 from database.filters_mdb import del_all
@@ -27,7 +30,7 @@ async def maybe_handle_filter_management_callback(client, query):
                 try:
                     chat = await client.get_chat(grpid)
                     title = chat.title
-                except Exception:
+                except RPCError:
                     await query.message.edit_text("Make sure I'm present in your group!!", quote=True)
                     return await query.answer(MSG_ALRT)
             else:
@@ -64,8 +67,8 @@ async def maybe_handle_filter_management_callback(client, query):
                 await query.message.delete()
                 try:
                     await query.message.reply_to_message.delete()
-                except Exception:
-                    pass
+                except RPCError:
+                    logging.getLogger(__name__).debug("Replied filter message was already unavailable", exc_info=True)
             else:
                 await query.answer("That's not for you!!", show_alert=True)
     else:
