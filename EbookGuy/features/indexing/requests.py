@@ -2,6 +2,7 @@ import logging
 import re
 
 from pyrogram import enums
+from pyrogram.errors import RPCError
 from pyrogram.errors.exceptions.bad_request_400 import (
     ChannelInvalid,
     ChatAdminRequired,
@@ -39,12 +40,12 @@ async def handle_send_for_index(bot, message):
         return await msg.reply('This may be a private channel / group. Make me an admin over there to index the files.')
     except (UsernameInvalid, UsernameNotModified):
         return await msg.reply('Invalid Link specified.')
-    except Exception:
+    except RPCError:
         logger.exception("Failed to validate indexing target chat")
         return await msg.reply('Unable to verify this chat right now. Please try again later.')
     try:
         k = await bot.get_messages(chat_id, last_msg_id)
-    except Exception:
+    except RPCError:
         logger.exception("Failed to fetch indexing target message")
         return await message.reply('Make sure I am an admin in the channel, if the channel is private.')
     if k.empty:
