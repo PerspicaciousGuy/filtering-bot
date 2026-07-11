@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from pyrogram.errors import FloodWait, InputUserDeactivated, PeerIdInvalid, UserIsBlocked
+from pyrogram.errors import FloodWait, InputUserDeactivated, PeerIdInvalid, RPCError, UserIsBlocked
 
 from database.users_chats_db import db
 
@@ -25,7 +25,7 @@ async def broadcast_messages(user_id, message):
         await db.delete_user(int(user_id))
         logging.info(f"{user_id} - PeerIdInvalid")
         return False, "Error"
-    except Exception:
+    except RPCError:
         return False, "Error"
 
 
@@ -34,11 +34,11 @@ async def broadcast_messages_group(chat_id, message):
         kd = await message.copy(chat_id=chat_id)
         try:
             await kd.pin()
-        except Exception:
-            pass
+        except RPCError:
+            logging.getLogger(__name__).debug("Broadcast copy could not be pinned", exc_info=True)
         return True, "Success"
     except FloodWait as e:
         await asyncio.sleep(e.x)
         return await broadcast_messages_group(chat_id, message)
-    except Exception:
+    except RPCError:
         return False, "Error"
