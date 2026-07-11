@@ -1,4 +1,4 @@
-from pyrogram.errors import PeerIdInvalid, UserIsBlocked
+from pyrogram.errors import PeerIdInvalid, RPCError, UserIsBlocked
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from info import CHNL_LNK, GRP_LNK, OWNER_LNK
@@ -27,5 +27,5 @@ async def send_all(bot, userid, files, ident, chat_id, user_name, query):
         await query.answer('Unblock the bot mahn !', show_alert=True)
     except PeerIdInvalid:
         await query.answer('Hey, Start Bot First And Click Send All', show_alert=True)
-    except Exception:
+    except RPCError:
         await query.answer('Hey, Start Bot First And Click Send All', show_alert=True)
