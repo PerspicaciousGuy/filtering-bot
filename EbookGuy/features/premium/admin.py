@@ -1,5 +1,7 @@
 import logging
 
+from pyrogram.errors import RPCError
+
 from database.users_chats_db import db
 
 logger = logging.getLogger(__name__)
@@ -24,8 +26,8 @@ async def handle_add_premium_command(client, message):
                     user_id,
                     f"🎉 <b>You've been gifted Premium!</b>\n\n📅 <b>Duration:</b> {days} days\n⏰ <b>Valid Until:</b> {new_expiry.strftime('%d %B %Y, %I:%M %p')}\n\n<i>Enjoy unlimited downloads!</i>"
                 )
-            except Exception:
-                pass
+            except (AttributeError, RPCError, TypeError, ValueError):
+                logger.debug("Optional premium operation failed", exc_info=True)
         else:
             await message.reply_text("❌ Error adding premium. User may not exist in database.")
     except ValueError:
@@ -111,7 +113,7 @@ async def handle_stars_balance_command(client, message):
         
         await message.reply_text(text)
         
-    except Exception:
+    except (AttributeError, RPCError, TypeError, ValueError):
         logger.exception("Failed to get star transactions")
         await message.reply_text("Could not fetch star data right now. Please try again later.")
 
@@ -122,8 +124,8 @@ async def handle_stars_history_command(client, message):
         if len(message.command) > 1:
             try:
                 limit = min(int(message.command[1]), 100)
-            except Exception:
-                pass
+            except (AttributeError, RPCError, TypeError, ValueError):
+                logger.debug("Optional premium operation failed", exc_info=True)
         
         transactions = await client.get_star_transactions(limit=limit)
         
@@ -150,6 +152,6 @@ async def handle_stars_history_command(client, message):
         
         await message.reply_text(text)
         
-    except Exception:
+    except (AttributeError, RPCError, TypeError, ValueError):
         logger.exception("Failed to get star history")
         await message.reply_text("Could not fetch star history right now. Please try again later.")
