@@ -27,7 +27,7 @@ async def maybe_handle_filter_management_callback(client, query):
                 try:
                     chat = await client.get_chat(grpid)
                     title = chat.title
-                except:
+                except Exception:
                     await query.message.edit_text("Make sure I'm present in your group!!", quote=True)
                     return await query.answer(MSG_ALRT)
             else:
@@ -64,7 +64,7 @@ async def maybe_handle_filter_management_callback(client, query):
                 await query.message.delete()
                 try:
                     await query.message.reply_to_message.delete()
-                except:
+                except Exception:
                     pass
             else:
                 await query.answer("That's not for you!!", show_alert=True)
