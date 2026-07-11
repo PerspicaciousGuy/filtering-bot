@@ -1,4 +1,5 @@
 import motor.motor_asyncio
+from pymongo.errors import DuplicateKeyError
 from info import AUTH_CHANNEL, OTHER_DB_URI
 
 class JoinReqs:
@@ -22,8 +23,8 @@ class JoinReqs:
     async def add_user(self, user_id, first_name, username, date):
         try:
             await self.col.insert_one({"_id": int(user_id),"user_id": int(user_id), "first_name": first_name, "username": username, "date": date})
-        except Exception:
-            pass
+        except DuplicateKeyError:
+            return
 
     async def get_user(self, user_id):
         return await self.col.find_one({"user_id": int(user_id)})
