@@ -65,8 +65,8 @@ async def answer(bot, query):
         if CUSTOM_FILE_CAPTION:
             try:
                 f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
-            except Exception as e:
-                logger.exception(e)
+            except Exception:
+                logger.exception("Failed to format custom inline caption")
                 f_caption=f_caption
         if f_caption is None:
             f_caption = f"{file['file_name']}"
@@ -95,8 +95,8 @@ async def answer(bot, query):
             )
         except QueryIdInvalid:
             pass
-        except Exception as e:
-            logging.exception(str(e))
+        except Exception:
+            logger.exception("Failed to answer inline query")
     else:
         switch_pm_text = f'{emoji.CROSS_MARK} No results'
         if string:
