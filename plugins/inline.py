@@ -2,6 +2,7 @@
 
 import logging
 from pyrogram import Client, emoji, filters
+from pyrogram.errors import RPCError
 from pyrogram.errors.exceptions.bad_request_400 import QueryIdInvalid
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultCachedDocument, InlineQuery
 from database.ia_filterdb import get_search_results
@@ -65,7 +66,7 @@ async def answer(bot, query):
         if CUSTOM_FILE_CAPTION:
             try:
                 f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
-            except Exception:
+            except (KeyError, RPCError, TypeError, ValueError):
                 logger.exception("Failed to format custom inline caption")
                 f_caption=f_caption
         if f_caption is None:
@@ -94,8 +95,8 @@ async def answer(bot, query):
                 next_offset=str(next_offset)
             )
         except QueryIdInvalid:
-            pass
-        except Exception:
+            logger.debug("Inline query expired before it could be answered")
+        except (KeyError, RPCError, TypeError, ValueError):
             logger.exception("Failed to answer inline query")
     else:
         switch_pm_text = f'{emoji.CROSS_MARK} No results'
