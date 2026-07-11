@@ -25,7 +25,7 @@ async def broadcast_messages(user_id, message):
         await db.delete_user(int(user_id))
         logging.info(f"{user_id} - PeerIdInvalid")
         return False, "Error"
-    except Exception as e:
+    except Exception:
         return False, "Error"
 
 
@@ -34,11 +34,11 @@ async def broadcast_messages_group(chat_id, message):
         kd = await message.copy(chat_id=chat_id)
         try:
             await kd.pin()
-        except:
+        except Exception:
             pass
         return True, "Success"
     except FloodWait as e:
         await asyncio.sleep(e.x)
         return await broadcast_messages_group(chat_id, message)
-    except Exception as e:
+    except Exception:
         return False, "Error"
