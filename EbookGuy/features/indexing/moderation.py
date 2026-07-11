@@ -36,7 +36,7 @@ async def handle_index_files(bot, query):
         )
     )
     try:
-        chat = int(chat)
-    except:
-        chat = chat
-    await index_files_to_db(int(lst_msg_id), chat, msg, bot)
+        chat_id = int(chat)
+    except ValueError:
+        chat_id = chat
+    await index_files_to_db(int(lst_msg_id), chat_id, msg, bot)
