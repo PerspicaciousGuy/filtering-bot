@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from pyrogram.errors import MessageNotModified
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -159,4 +160,4 @@ async def handle_show_premium_callback(client, query):
             disable_web_page_preview=True
         )
     except MessageNotModified:
-        pass
+        logging.getLogger(__name__).debug("Premium view is already current")
