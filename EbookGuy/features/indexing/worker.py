@@ -138,9 +138,9 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, resume=False):
                         stats['duplicate'] += 1
                     elif code == 2:
                         stats['errors'] += 1
-                except Exception as e:
+                except Exception:
                     stats['errors'] += 1
-                    logger.error(f"Error saving file: {e}")
+                    logger.exception("Failed to save indexed file")
                     
         except FloodWait as e:
             # Save progress before waiting
@@ -157,11 +157,11 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, resume=False):
             await msg.edit("▶️ Resuming indexing...")
             return await index_files_to_db(lst_msg_id, chat, msg, bot, resume=True)
             
-        except Exception as e:
+        except Exception:
             save_checkpoint(chat, current, stats)
-            logger.exception(e)
+            logger.exception("Indexing failed unexpectedly")
             await msg.edit(
-                f"❌ **Error:** `{e}`\n\n"
+                f"**Indexing failed unexpectedly.**\n\n"
                 f"Progress saved at message #{current}\n"
                 f"Use /resume to continue.\n\n"
                 + format_progress(current, stats)
