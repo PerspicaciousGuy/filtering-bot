@@ -1,3 +1,5 @@
+import logging
+
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import delete_checkpoint, get_all_checkpoints, get_checkpoint
@@ -5,12 +7,14 @@ from info import ADMINS
 from EbookGuy.features.indexing.worker import index_files_to_db, lock
 from utils import temp
 
+logger = logging.getLogger(__name__)
+
 async def handle_set_skip_number(bot, message):
     if ' ' in message.text:
         _, skip = message.text.split(" ", 1)
         try:
             skip = int(skip)
-        except:
+        except Exception:
             return await message.reply("Skip number should be an integer.")
         await message.reply(f"✅ Successfully set SKIP number to **{skip}**\n\nIndexing will start from message #{skip}")
         temp.CURRENT = int(skip)
@@ -38,7 +42,7 @@ async def handle_resume_indexing(bot, message):
         try:
             chat = await bot.get_chat(chat_id)
             chat_name = chat.title or chat_id
-        except:
+        except Exception:
             chat_name = chat_id
         
         buttons = [[
@@ -79,7 +83,7 @@ async def handle_resume_callback(bot, query):
     chat_id = query.data.split('#')[1]
     try:
         chat_id = int(chat_id)
-    except:
+    except Exception:
         pass
     
     cp = get_checkpoint(chat_id)
@@ -97,8 +101,9 @@ async def handle_resume_callback(bot, query):
         async for msg in bot.get_chat_history(chat_id, limit=1):
             last_msg_id = msg.id
             break
-    except Exception as e:
-        return await query.message.edit(f"❌ Error accessing channel: {e}")
+    except Exception:
+        logger.exception("Failed to access channel while resuming indexing")
+        return await query.message.edit("Could not access that channel. Please check the bot permissions and try again.")
     
     await query.message.edit(
         f"▶️ **Resuming indexing from message #{cp['current_msg']}...**",
@@ -115,7 +120,7 @@ async def handle_delete_checkpoint_callback(bot, query):
     chat_id = query.data.split('#')[1]
     try:
         chat_id = int(chat_id)
-    except:
+    except Exception:
         pass
     
     delete_checkpoint(chat_id)
