@@ -1,7 +1,8 @@
 import logging
 
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, LabeledPrice
-from pyrogram.errors import MessageNotModified
+from pyrogram.errors import MessageNotModified, RPCError
+from pymongo.errors import PyMongoError
 from database.users_chats_db import db
 from info import PREMIUM_PRICES, PREMIUM_PRICES_INR, PAYMENT_WEBSITE
 from Script import script
@@ -48,7 +49,7 @@ async def handle_buy_premium_callback(client, query):
             disable_web_page_preview=True
         )
     except MessageNotModified:
-        pass
+        logger.debug("Premium view is already current")
 
 async def handle_confirm_premium_callback(client, query):
     """Handle confirmed premium purchase - send Telegram Stars invoice"""
@@ -63,14 +64,14 @@ async def handle_confirm_premium_callback(client, query):
     if user_id in last_invoice_messages:
         try:
             await client.delete_messages(user_id, last_invoice_messages[user_id])
-        except Exception:
-            pass
+        except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
+            logger.debug("Previous invoice message was already unavailable", exc_info=True)
     
     # Delete the confirmation message
     try:
         await query.message.delete()
-    except Exception:
-        pass
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
+        logger.debug("Payment confirmation message was already unavailable", exc_info=True)
     
     # Create invoice for Telegram Stars payment
     try:
@@ -85,7 +86,7 @@ async def handle_confirm_premium_callback(client, query):
         # Track this invoice message
         last_invoice_messages[user_id] = invoice_msg.id
         await query.answer()
-    except Exception:
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to create Telegram Stars invoice")
         await query.answer("Error creating payment. Please try again later.", show_alert=True)
 
@@ -105,7 +106,7 @@ async def handle_pre_checkout_handler(client, query: PreCheckoutQuery):
                     return
         
         await query.answer(ok=False, error_message="Invalid payment request")
-    except Exception:
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed during Telegram Stars pre-checkout")
         await query.answer(ok=False, error_message="Payment verification failed")
 
@@ -147,6 +148,6 @@ Use /mystatus to check your premium status anytime.
                 logger.info(f"Premium activated: User {user_id}, {days} days, {payment.total_amount} stars")
             else:
                 await message.reply_text("❌ Error activating premium. Please contact support.")
-    except Exception:
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to process successful premium payment")
         await message.reply_text("Error processing payment. Please contact support with your payment receipt.")
