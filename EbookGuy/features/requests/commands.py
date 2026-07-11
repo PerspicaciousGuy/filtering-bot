@@ -2,6 +2,9 @@ from Script import script
 from pyrogram.types import *
 from pyrogram.errors import UserIsBlocked
 from info import *
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def handle_requests(bot, message):
     if message.reply_to_message:
@@ -26,8 +29,9 @@ async def handle_requests(bot, message):
                     await message.reply_text("<b>You must type about your request [Minimum 3 Characters]. Requests can't be empty.</b>")
             if len(content) < 3:
                 success = False
-        except Exception as e:
-            await message.reply_text(f"Error: {e}")
+        except Exception:
+            logger.exception("Failed to forward replied request")
+            await message.reply_text("Something went wrong while sending your request. Please try again later.")
         
     elif message.text:
         reporter = str(message.from_user.id)
@@ -55,8 +59,9 @@ async def handle_requests(bot, message):
                     await message.reply_text("<b>You must type about your request [Minimum 3 Characters]. Requests can't be empty.</b>")
             if len(content) < 3:
                 success = False
-        except Exception as e:
-            await message.reply_text(f"Error: {e}")
+        except Exception:
+            logger.exception("Failed to forward request message")
+            await message.reply_text("Something went wrong while sending your request. Please try again later.")
 
     else:
         success = False
@@ -68,7 +73,7 @@ async def handle_requests(bot, message):
                     try:
                         link = await bot.create_chat_invite_link(int(REQST_CHANNEL))
                         url = link.invite_link
-                    except:
+                    except Exception:
                         url = CHNL_LNK
                     
                     btn = [[
@@ -78,7 +83,8 @@ async def handle_requests(bot, message):
                     await message.reply_text("<b>Your request has been added! Please wait for some time.\n\nJoin Channel First & View Request</b>", reply_markup=InlineKeyboardMarkup(btn))
                 else:
                     await message.reply_text("<b>Your request has been sent to Admins!</b>")
-            except Exception as e:
-                await message.reply_text(f"Request sent, but failed to reply to you: {e}")
+            except Exception:
+                logger.exception("Failed to send request confirmation")
+                await message.reply_text("Your request was sent, but I could not send the confirmation message.")
         elif REQST_CHANNEL is None:
              await message.reply_text("<b>Your request has been sent to Admins!</b>")
