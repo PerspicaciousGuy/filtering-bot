@@ -5,7 +5,7 @@ from struct import pack
 from datetime import datetime
 from pyrogram.file_id import FileId
 from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 from info import FILE_DB_URI, SEC_FILE_DB_URI, DATABASE_NAME, COLLECTION_NAME, MULTIPLE_DATABASE, USE_CAPTION_FILTER, MAX_B_TN, ALLOWED_EXTENSIONS, FILTER_BY_EXTENSION
 
 # First Database For File Saving 
@@ -45,7 +45,7 @@ async def save_file(media):
     except DuplicateKeyError:
         print(f"{file_name} is already saved.")
         return False, 0
-    except Exception:
+    except PyMongoError:
         if MULTIPLE_DATABASE:
             try:
                 sec_col.insert_one(file)
@@ -101,7 +101,7 @@ async def get_search_results(chat_id, query, file_type=None, max_results=10, off
         raw_pattern = query.replace(' ', r'.*[\s\.\+\-_]') 
     try:
         regex = re.compile(raw_pattern, flags=re.IGNORECASE)
-    except Exception:
+    except re.error:
         regex = query
     
     # Build filter with optional format type
