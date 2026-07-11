@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from Script import script
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -37,8 +38,8 @@ async def handle_download_book_callback(client, query):
     if CUSTOM_FILE_CAPTION:
         try:
             f_caption = CUSTOM_FILE_CAPTION.format(file_name=title or '', file_size=size or '', file_caption=f_caption or '')
-        except Exception:
-            pass
+        except (KeyError, ValueError):
+            logging.getLogger(__name__).warning("Invalid custom download caption format", exc_info=True)
     if not f_caption:
         f_caption = ' '.join(filter(lambda x: not x.startswith('[') and not x.startswith('@'), title.split()))
 
