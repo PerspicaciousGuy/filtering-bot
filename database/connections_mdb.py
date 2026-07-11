@@ -1,6 +1,7 @@
 
 
 import pymongo
+from pymongo.errors import PyMongoError
 
 from info import OTHER_DB_URI, DATABASE_NAME
 
@@ -36,8 +37,8 @@ async def add_connection(group_id, user_id):
         try:
             mycol.insert_one(data)
             return True
-        except Exception:
-            logger.exception('Some error occurred!', exc_info=True)
+        except PyMongoError:
+            logger.exception('Failed to add connection')
 
     else:
         try:
@@ -49,8 +50,8 @@ async def add_connection(group_id, user_id):
                 }
             )
             return True
-        except Exception:
-            logger.exception('Some error occurred!', exc_info=True)
+        except PyMongoError:
+            logger.exception('Failed to update connection')
 
         
 async def active_connection(user_id):
@@ -128,7 +129,7 @@ async def delete_connection(user_id, group_id):
                 {"$set": {"active_group" : None}}
             )
         return True
-    except Exception:
+    except (KeyError, TypeError, PyMongoError):
         logger.exception('Failed to delete connection')
         return False
 
