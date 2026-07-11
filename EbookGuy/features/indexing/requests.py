@@ -39,13 +39,14 @@ async def handle_send_for_index(bot, message):
         return await msg.reply('This may be a private channel / group. Make me an admin over there to index the files.')
     except (UsernameInvalid, UsernameNotModified):
         return await msg.reply('Invalid Link specified.')
-    except Exception as e:
-        logger.exception(e)
-        return await msg.reply(f'Errors - {e}')
+    except Exception:
+        logger.exception("Failed to validate indexing target chat")
+        return await msg.reply('Unable to verify this chat right now. Please try again later.')
     try:
         k = await bot.get_messages(chat_id, last_msg_id)
-    except:
-        return await message.reply('Make Sure That I am An Admin In The Channel, if channel is private')
+    except Exception:
+        logger.exception("Failed to fetch indexing target message")
+        return await message.reply('Make sure I am an admin in the channel, if the channel is private.')
     if k.empty:
         return await message.reply('This may be group and I am not an admin of the group.')
 
@@ -78,7 +79,7 @@ async def handle_send_for_index(bot, message):
         except ChatAdminRequired:
             return await message.reply('Make sure I am an admin in the chat and have permission to invite users.')
     else:
-        link = f"@{message.forward_from_chat.username}"
+        link = f"@{chat_id}"
     buttons = [[
         InlineKeyboardButton('Accept Index', callback_data=f'index#accept#{chat_id}#{last_msg_id}#{message.from_user.id}')
     ],[
