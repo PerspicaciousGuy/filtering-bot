@@ -178,8 +178,8 @@ async def global_filters(client, message, text=False):
                                     reply_msg = await message.reply_text(f"<b><i>Searching For {message.text} 🔍</i></b>")
                                     await auto_filter(client, message.text, message, reply_msg, ai_search)
 
-                except Exception as e:
-                    logger.exception(e)
+                except Exception:
+                    logger.exception("Failed to process global filter")
                 break
     else:
         return False
