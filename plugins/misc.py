@@ -34,8 +34,9 @@ async def who_is(client, message):
     from_user_id, _ = extract_user(message)
     try:
         from_user = await client.get_users(from_user_id)
-    except Exception as error:
-        await status_message.edit(str(error))
+    except Exception:
+        logger.exception("Failed to fetch user info")
+        await status_message.edit("Could not fetch user info right now.")
         return
     if from_user is None:
         return await status_message.edit("no valid user_id / message specified")
