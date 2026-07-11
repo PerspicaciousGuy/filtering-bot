@@ -1,5 +1,8 @@
 import asyncio
+import logging
 import datetime
+
+from pyrogram.errors import RPCError
 
 from Script import script
 from database.users_chats_db import db
@@ -50,6 +53,6 @@ async def send_auto_delete_message(client, user_id, filesarr):
     for msg in filesarr:
         try:
             await msg.delete()
-        except Exception:
-            pass
+        except RPCError:
+            logging.getLogger(__name__).debug("Auto-delete message was already unavailable", exc_info=True)
     await k.edit_text("<b>✅ Your message is successfully deleted</b>")
