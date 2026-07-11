@@ -1,4 +1,4 @@
-import asyncio, os, re, sys
+import asyncio, logging, os, re, sys
 
 from pyrogram import enums
 from pyrogram.types import *
@@ -6,6 +6,8 @@ from database.ia_filterdb import col, sec_col, unpack_new_file_id, get_bad_files
 from database.users_chats_db import db
 from info import *
 from utils import get_size
+
+logger = logging.getLogger(__name__)
 
 async def handle_channel_info(bot, message):
     text = '📑 **Indexed channels/groups**\n'
@@ -30,8 +32,9 @@ async def handle_channel_info(bot, message):
 async def handle_log_file(bot, message):
     try:
         await message.reply_document('TELEGRAM BOT.LOG')
-    except Exception as e:
-        await message.reply(str(e))
+    except Exception:
+        logger.exception("Failed to send log file")
+        await message.reply("Could not send the log file right now.")
 
 async def handle_delete(bot, message):
     reply = await bot.ask(message.from_user.id, "Now Send Me Media Which You Want to delete")
@@ -134,15 +137,16 @@ async def handle_send_msg(bot, message):
                 await message.reply_text(f"<b>Your message has been successfully send to {user.mention}.</b>")
             else:
                 await message.reply_text("<b>This user didn't started this bot yet !</b>")
-        except Exception as e:
-            await message.reply_text(f"<b>Error: {e}</b>")
+        except Exception:
+            logger.exception("Failed to send admin message")
+            await message.reply_text("<b>Could not send that message right now.</b>")
     else:
         await message.reply_text("<b>Use this command as a reply to any message using the target chat id. For eg: /send userid</b>")
 
 async def handle_deletemultiplefiles(bot, message):
     try:
         keyword = message.text.split(" ", 1)[1]
-    except:
+    except Exception:
         return await message.reply_text(f"<b>Hey {message.from_user.mention}, Give me a keyword along with the command to delete files.</b>")
     k = await bot.send_message(chat_id=message.chat.id, text=f"<b>Fetching Files for your query {keyword} on DB... Please wait...</b>")
     files, total = await get_bad_files(keyword)
@@ -201,8 +205,9 @@ async def handle_stats(client, message):
             f"🗄️ <b>Database</b>{db_info}"
         )
         await msg.edit_text(text)
-    except Exception as e:
-        await msg.edit_text(f"<b>Error fetching stats:</b> <code>{e}</code>")
+    except Exception:
+        logger.exception("Failed to fetch admin stats")
+        await msg.edit_text("<b>Error fetching stats. Please try again later.</b>")
 
 async def handle_stop_button(bot, message):
     msg = await bot.send_message(text="**🔄 𝙿𝚁𝙾𝙲𝙴𝚂𝚂𝙴𝚂 𝚂𝚃𝙾𝙿𝙴𝙳. 𝙱𝙾𝚃 𝙸𝚂 𝚁𝙴𝚂𝚃𝙰𝚁��𝙶...**", chat_id=message.chat.id)       
