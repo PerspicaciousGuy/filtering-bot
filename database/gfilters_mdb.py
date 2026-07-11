@@ -25,10 +25,10 @@ async def find_gfilter(gfilters, name):
             fileid = file['file']
             try:
                 alert = file['alert']
-            except:
+            except Exception:
                 alert = None
         return reply_text, btn, alert, fileid
-    except:
+    except Exception:
         return None, None, None, None
 
 
@@ -41,7 +41,7 @@ async def get_gfilters(gfilters):
         for file in query:
             text = file['text']
             texts.append(text)
-    except:
+    except Exception:
         pass
     return texts
 
@@ -55,7 +55,7 @@ async def del_allg(message, gfilters):
     try:
         mycol.drop()
         await message.edit_text(f"All gfilters has been removed !")
-    except:
+    except Exception:
         await message.edit_text("Couldn't remove all gfilters !")
         return
 
