@@ -45,7 +45,7 @@ async def save_file(media):
     except DuplicateKeyError:
         print(f"{file_name} is already saved.")
         return False, 0
-    except:
+    except Exception:
         if MULTIPLE_DATABASE:
             try:
                 sec_col.insert_one(file)
@@ -101,7 +101,7 @@ async def get_search_results(chat_id, query, file_type=None, max_results=10, off
         raw_pattern = query.replace(' ', r'.*[\s\.\+\-_]') 
     try:
         regex = re.compile(raw_pattern, flags=re.IGNORECASE)
-    except:
+    except Exception:
         regex = query
     
     # Build filter with optional format type
