@@ -24,7 +24,7 @@ async def handle_add_premium_command(client, message):
                     user_id,
                     f"🎉 <b>You've been gifted Premium!</b>\n\n📅 <b>Duration:</b> {days} days\n⏰ <b>Valid Until:</b> {new_expiry.strftime('%d %B %Y, %I:%M %p')}\n\n<i>Enjoy unlimited downloads!</i>"
                 )
-            except:
+            except Exception:
                 pass
         else:
             await message.reply_text("❌ Error adding premium. User may not exist in database.")
@@ -111,9 +111,9 @@ async def handle_stars_balance_command(client, message):
         
         await message.reply_text(text)
         
-    except Exception as e:
-        logger.error(f"Error getting star transactions: {e}")
-        await message.reply_text(f"❌ Error fetching star data: {e}")
+    except Exception:
+        logger.exception("Failed to get star transactions")
+        await message.reply_text("Could not fetch star data right now. Please try again later.")
 
 async def handle_stars_history_command(client, message):
     """Admin command to get detailed star transaction history"""
@@ -122,7 +122,7 @@ async def handle_stars_history_command(client, message):
         if len(message.command) > 1:
             try:
                 limit = min(int(message.command[1]), 100)
-            except:
+            except Exception:
                 pass
         
         transactions = await client.get_star_transactions(limit=limit)
@@ -150,6 +150,6 @@ async def handle_stars_history_command(client, message):
         
         await message.reply_text(text)
         
-    except Exception as e:
-        logger.error(f"Error getting star history: {e}")
-        await message.reply_text(f"❌ Error fetching star history: {e}")
+    except Exception:
+        logger.exception("Failed to get star history")
+        await message.reply_text("Could not fetch star history right now. Please try again later.")
