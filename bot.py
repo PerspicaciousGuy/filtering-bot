@@ -10,6 +10,8 @@ logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("cinemagoer").setLevel(logging.ERROR)
 
 from pyrogram import Client, idle
+from pyrogram.errors import RPCError
+from pymongo.errors import PyMongoError
 from database.users_chats_db import db
 from info import *
 from utils import temp
@@ -66,8 +68,8 @@ async def start():
             try:
                 total = col.count_documents({}) + sec_col.count_documents({})
                 temp.LIB_COUNT = f"{total // 1000}K" if total >= 1000 else str(total)
-            except Exception:
-                pass
+            except PyMongoError:
+                logging.exception("Failed to refresh cached library count")
             await asyncio.sleep(3600)
     asyncio.create_task(refresh_lib_count())
 
@@ -78,19 +80,19 @@ async def start():
     time = now.strftime("%H:%M:%S %p")
     try:
         await EbookGuyBot.send_message(chat_id=LOG_CHANNEL, text=script.RESTART_TXT.format(today, time))
-    except Exception:
-        print("Make Your Bot Admin In Log Channel With Full Rights")
+    except RPCError:
+        logging.exception("Failed to send restart notification to log channel")
     for ch in CHANNELS:
         try:
             k = await EbookGuyBot.send_message(chat_id=ch, text="**Bot Restarted**")
             await k.delete()
-        except Exception:
-            print("Make Your Bot Admin In File Channels With Full Rights")
+        except RPCError:
+            logging.exception("Failed to send restart notification to file channel %s", ch)
     try:
         k = await EbookGuyBot.send_message(chat_id=AUTH_CHANNEL, text="**Bot Restarted**")
         await k.delete()
-    except Exception:
-        print("Make Your Bot Admin In Force Subscribe Channel With Full Rights")
+    except RPCError:
+        logging.exception("Failed to send restart notification to force-subscribe channel")
     await idle()
 
 
