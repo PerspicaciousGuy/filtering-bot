@@ -1,6 +1,7 @@
 
 
 import pymongo
+from pymongo.errors import PyMongoError
 from info import OTHER_DB_URI, DATABASE_NAME
 from pyrogram import enums
 import logging
@@ -24,10 +25,11 @@ async def find_filter(group_id, name):
             fileid = file['file']
             try:
                 alert = file['alert']
-            except Exception:
+            except KeyError:
                 alert = None
         return reply_text, btn, alert, fileid
-    except Exception:
+    except (KeyError, PyMongoError):
+        logger.exception("Failed to find filter")
         return None, None, None, None
 
 
@@ -40,8 +42,8 @@ async def get_filters(group_id):
         for file in query:
             text = file['text']
             texts.append(text)
-    except Exception:
-        pass
+    except (KeyError, PyMongoError):
+        logger.exception("Failed to list filters")
     return texts
 
 
@@ -54,7 +56,8 @@ async def del_all(message, group_id, title):
     try:
         mycol.drop()
         await message.edit_text(f"All filters from {title} has been removed")
-    except Exception:
+    except PyMongoError:
+        logger.exception("Failed to remove all filters")
         await message.edit_text("Couldn't remove all filters from group!")
         return
 
