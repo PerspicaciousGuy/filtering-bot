@@ -1,5 +1,7 @@
 import logging
 
+from pyrogram.errors import RPCError
+
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import delete_checkpoint, get_all_checkpoints, get_checkpoint
@@ -14,7 +16,7 @@ async def handle_set_skip_number(bot, message):
         _, skip = message.text.split(" ", 1)
         try:
             skip = int(skip)
-        except Exception:
+        except (RPCError, TypeError, ValueError):
             return await message.reply("Skip number should be an integer.")
         await message.reply(f"✅ Successfully set SKIP number to **{skip}**\n\nIndexing will start from message #{skip}")
         temp.CURRENT = int(skip)
@@ -42,7 +44,7 @@ async def handle_resume_indexing(bot, message):
         try:
             chat = await bot.get_chat(chat_id)
             chat_name = chat.title or chat_id
-        except Exception:
+        except (RPCError, TypeError, ValueError):
             chat_name = chat_id
         
         buttons = [[
@@ -83,8 +85,8 @@ async def handle_resume_callback(bot, query):
     chat_id = query.data.split('#')[1]
     try:
         chat_id = int(chat_id)
-    except Exception:
-        pass
+    except (RPCError, TypeError, ValueError):
+        logger.debug("Using non-numeric checkpoint chat identifier: %s", chat_id)
     
     cp = get_checkpoint(chat_id)
     if not cp:
@@ -101,7 +103,7 @@ async def handle_resume_callback(bot, query):
         async for msg in bot.get_chat_history(chat_id, limit=1):
             last_msg_id = msg.id
             break
-    except Exception:
+    except (RPCError, TypeError, ValueError):
         logger.exception("Failed to access channel while resuming indexing")
         return await query.message.edit("Could not access that channel. Please check the bot permissions and try again.")
     
@@ -120,8 +122,8 @@ async def handle_delete_checkpoint_callback(bot, query):
     chat_id = query.data.split('#')[1]
     try:
         chat_id = int(chat_id)
-    except Exception:
-        pass
+    except (RPCError, TypeError, ValueError):
+        logger.debug("Using non-numeric checkpoint chat identifier: %s", chat_id)
     
     delete_checkpoint(chat_id)
     await query.answer("Checkpoint deleted!")
