@@ -1,6 +1,8 @@
+import logging
 from typing import Union
 
 from pyrogram import enums
+from pyrogram.errors import RPCError
 from pyrogram.types import Message
 
 from info import ADMINS
@@ -46,7 +48,7 @@ def extract_user(message: Message) -> Union[int, str]:
         try:
             user_id = int(user_id)
         except ValueError:
-            pass
+            logging.getLogger(__name__).debug("Using non-numeric user identifier: %s", user_id)
     else:
         user_id = message.from_user.id
         user_first_name = message.from_user.first_name
@@ -61,5 +63,5 @@ async def is_admin_or_owner(client, grp_id, user_id):
             member.status in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]
             or str(user_id) in ADMINS
         )
-    except Exception:
+    except RPCError:
         return str(user_id) in ADMINS
