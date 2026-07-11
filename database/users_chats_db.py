@@ -2,7 +2,7 @@ import motor.motor_asyncio
 
 from info import DATABASE_NAME, USER_DB_URI
 from database.users_chats_premium_db import PremiumUsageMixin
-from database.users_chats_settings_db import ChatSettingsMixin, default_setgs
+from database.users_chats_settings_db import ChatSettingsMixin
 from database.users_chats_user_db import UserRecordsMixin
 
 

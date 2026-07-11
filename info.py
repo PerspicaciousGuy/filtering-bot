@@ -230,7 +230,7 @@ MAX_LIST_ELM = environ.get("MAX_LIST_ELM", None)           # Max list elements
 # 🔧 SECTION 11: DATABASE URI ASSIGNMENT (Don't modify unless you know what you're doing)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if MULTIPLE_DATABASE == False:
+if not MULTIPLE_DATABASE:
     USER_DB_URI = DATABASE_URI
     OTHER_DB_URI = DATABASE_URI
     FILE_DB_URI = DATABASE_URI

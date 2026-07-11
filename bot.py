@@ -1,5 +1,4 @@
-import sys, glob, logging, logging.config, asyncio
-from pathlib import Path
+import glob, logging, logging.config, asyncio
 from aiohttp import web
 import pytz
 
@@ -9,7 +8,7 @@ logging.getLogger().setLevel(logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("cinemagoer").setLevel(logging.ERROR)
 
-from pyrogram import Client, idle
+from pyrogram import idle
 from pyrogram.errors import RPCError
 from pymongo.errors import PyMongoError
 from database.users_chats_db import db
@@ -44,7 +43,6 @@ async def web_server():
 async def start():
     print('\n')
     print('Initalizing Your Bot')
-    bot_info = await EbookGuyBot.get_me()
     await initialize_clients()
     
     if ON_HEROKU:

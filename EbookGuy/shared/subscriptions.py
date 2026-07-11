@@ -29,7 +29,7 @@ async def pub_is_subscribed(bot, query, channel):
 
 
 async def is_subscribed(bot, query):
-    if REQUEST_TO_JOIN_MODE == True and join_db().isActive():
+    if REQUEST_TO_JOIN_MODE and join_db().isActive():
         try:
             user = await join_db().get_user(query.from_user.id)
             if user and user["user_id"] == query.from_user.id:

@@ -5,7 +5,6 @@ from pyrogram.errors import MessageNotModified, RPCError
 from pymongo.errors import PyMongoError
 from database.users_chats_db import db
 from info import PREMIUM_PRICES, PREMIUM_PRICES_INR, PAYMENT_WEBSITE
-from Script import script
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

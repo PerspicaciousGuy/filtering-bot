@@ -3,7 +3,6 @@ import logging
 
 from pyrogram.errors import PeerIdInvalid, RPCError, UserIsBlocked
 from pymongo.errors import PyMongoError
-from pyrogram.types import InlineKeyboardMarkup
 
 from database.ia_filterdb import col, get_bad_files, get_file_details, sec_col
 from info import AUTH_CHANNEL, CUSTOM_FILE_CAPTION
@@ -40,7 +39,6 @@ async def maybe_handle_file_callback(client, query):
                                                        duration='')
             except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
                 logger.exception("Failed to format custom file callback caption")
-            f_caption = f_caption
         if f_caption is None:
             f_caption = f"{files['file_name']}"
 
@@ -113,7 +111,6 @@ async def maybe_handle_file_callback(client, query):
                                                        duration='')
             except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
                 logger.exception("Failed to format custom delete callback caption")
-            f_caption = f_caption
         if f_caption is None:
             f_caption = f"{files['file_name']}"
         await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start=file_{file_id}")
@@ -130,8 +127,7 @@ async def maybe_handle_file_callback(client, query):
 
     elif query.data.startswith("pages#"):
         ident, keyword = query.data.split("#")
-        #await query.message.edit_text(f"<b>Fetching Files for your query {keyword} on DB... Please wait...</b>")
-        files, total = await get_bad_files(keyword)
+        files, _ = await get_bad_files(keyword)
         await query.message.edit_text("<b>File deletion process will start in 5 seconds !</b>")
         await asyncio.sleep(5)
         deleted = 0

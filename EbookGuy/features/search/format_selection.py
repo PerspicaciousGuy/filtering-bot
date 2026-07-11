@@ -26,8 +26,6 @@ async def show_format_selection(message, query_text):
 
 async def handle_private_text(bot, message):
     content = message.text
-    user = message.from_user.first_name
-    user_id = message.from_user.id
     if content.startswith("/") or content.startswith("#"): return  # ignore commands and hashtags
     await show_format_selection(message, content)
 

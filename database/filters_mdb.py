@@ -3,7 +3,6 @@
 import pymongo
 from pymongo.errors import PyMongoError
 from info import OTHER_DB_URI, DATABASE_NAME
-from pyrogram import enums
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -15,19 +14,12 @@ mydb = myclient[DATABASE_NAME]
 
 async def find_filter(group_id, name):
     mycol = mydb[str(group_id)]
-    
-    query = mycol.find( {"text":name})
-    # query = mycol.find( { "$text": {"$search": name}})
+
     try:
-        for file in query:
-            reply_text = file['reply']
-            btn = file['btn']
-            fileid = file['file']
-            try:
-                alert = file['alert']
-            except KeyError:
-                alert = None
-        return reply_text, btn, alert, fileid
+        file = mycol.find_one({"text": name})
+        if file is None:
+            return None, None, None, None
+        return file["reply"], file["btn"], file.get("alert"), file["file"]
     except (KeyError, PyMongoError):
         logger.exception("Failed to find filter")
         return None, None, None, None

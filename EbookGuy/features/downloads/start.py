@@ -44,7 +44,7 @@ async def handle_start(client, message):
     
     if AUTH_CHANNEL and not await is_subscribed(client, message):
         try:
-            if REQUEST_TO_JOIN_MODE == True:
+            if REQUEST_TO_JOIN_MODE:
                 invite_link = await client.create_chat_invite_link(chat_id=(int(AUTH_CHANNEL)), creates_join_request=True)
             else:
                 invite_link = await client.create_chat_invite_link(int(AUTH_CHANNEL))
@@ -54,8 +54,8 @@ async def handle_start(client, message):
         try:
             btn = [[InlineKeyboardButton(script.BACKUP_CHANNEL_BTN, url=invite_link.invite_link)]]
             if message.command[1] != "subscribe":
-                if REQUEST_TO_JOIN_MODE == True:
-                    if TRY_AGAIN_BTN == True:
+                if REQUEST_TO_JOIN_MODE:
+                    if TRY_AGAIN_BTN:
                         try:
                             kk, file_id = message.command[1].split("_", 1)
                             btn.append([InlineKeyboardButton(script.TRY_AGAIN_BTN, callback_data=f"checksub#{kk}#{file_id}")])
@@ -67,8 +67,8 @@ async def handle_start(client, message):
                         btn.append([InlineKeyboardButton(script.TRY_AGAIN_BTN, callback_data=f"checksub#{kk}#{file_id}")])
                     except (IndexError, ValueError):
                         btn.append([InlineKeyboardButton(script.TRY_AGAIN_BTN, url=f"https://t.me/{temp.U_NAME}?start={message.command[1]}")])
-            if REQUEST_TO_JOIN_MODE == True:
-                if TRY_AGAIN_BTN == True:
+            if REQUEST_TO_JOIN_MODE:
+                if TRY_AGAIN_BTN:
                     text = script.BACKUP_CHANNEL_NOT_JOINED
                 else:
                     await db.set_msg_command(message.from_user.id, com=message.command[1])
@@ -133,7 +133,7 @@ async def handle_start(client, message):
                 try:
                     f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
                 except (binascii.Error, KeyError, RPCError, TypeError, UnicodeError, ValueError):
-                    f_caption=f_caption
+                    logging.getLogger(__name__).warning("Could not format the custom file caption", exc_info=True)
             if f_caption is None:
                 f_caption = f"{' '.join(filter(lambda x: not x.startswith('[') and not x.startswith('@'), files1['file_name'].split()))}"
             reply_markup = None
@@ -156,7 +156,6 @@ async def handle_start(client, message):
         
     elif pre in ["file", "filep"]:
         # Main file handler
-        user = message.from_user.id
         files_ = await get_file_details(file_id)           
         if not files_:
             pre, file_id = ((base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))).decode("ascii")).split("_", 1)

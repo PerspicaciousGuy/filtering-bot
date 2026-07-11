@@ -19,17 +19,17 @@ Current domain layout:
 The local repository is on branch `main`, tracks `origin/main`, and local-only `AGENTS.md` / `agents-guidelines/` should remain ignored and untracked.
 
 ## Last Action
-Completed the full Python exception-handling cleanup across 38 modified code files:
-- Replaced all remaining `except Exception` and bare handlers with failure-specific exceptions such as `RPCError`, `PyMongoError`, parsing errors, formatting errors, and filesystem errors.
-- Removed two unreachable parser fallback blocks and replaced all pass-only exception handlers with explicit fallback behavior or diagnostic logging.
-- Preserved user-facing fallback behavior while allowing genuinely unexpected programming errors to propagate.
+Fixed empty-result handling in manual and global filter database lookups:
+- Replaced cursor loops with single `find_one()` lookups.
+- Both functions now explicitly return `(None, None, None, None)` when no record matches.
+- Optional alert data now uses `dict.get()` while required stored fields retain explicit key access and existing error logging.
 
-Verification: required exception imports succeeded; the AST audit found zero broad, bare, undefined, or pass-only handlers; `python -m compileall -q .` passed; and `git diff --check` passed. No test files or test configuration exist in the repository.
+Verification: isolated smoke checks passed for empty results, complete records, records without alerts, and `PyMongoError`; `python -m compileall -q .` and `git diff --check` passed.
 ## In Progress
 No active file edit is in progress.
 
 ## Pending
-- Add characterization tests or lightweight smoke checks for the exception fallback paths.
+- Convert synchronous PyMongo operations inside async functions one module at a time, starting with `database/connections_mdb.py`.
 - Review synchronous PyMongo calls inside async functions and move blocking work off the event loop where needed.
 - Consider later internal function-level cleanup for modules that are under 300 lines but still have large functions, such as `EbookGuy/features/search/results.py`, `EbookGuy/features/downloads/start.py`, and `EbookGuy/features/indexing/worker.py`.
 
@@ -41,9 +41,9 @@ No active file edit is in progress.
 - Compile verification generated ignored `__pycache__/` files.
 
 ## Files Status
-- Created: `EbookGuy/features/__init__.py`, `EbookGuy/features/search/`, `EbookGuy/features/filters/`, `EbookGuy/features/downloads/`, `EbookGuy/features/premium/`, `EbookGuy/features/indexing/`, `EbookGuy/features/admin/`, `EbookGuy/features/requests/`, `EbookGuy/shared/`, and package `__init__.py` files inside each new folder.
+- Created: `EbookGuy/features/filters/delivery.py`, `EbookGuy/features/__init__.py`, `EbookGuy/features/search/`, `EbookGuy/features/filters/`, `EbookGuy/features/downloads/`, `EbookGuy/features/premium/`, `EbookGuy/features/indexing/`, `EbookGuy/features/admin/`, `EbookGuy/features/requests/`, `EbookGuy/shared/`, and package `__init__.py` files inside each new folder.
 - Moved: plugin implementation modules from `plugins/` into their matching `EbookGuy/features/*` folders; root `utils_*` modules into `EbookGuy/shared/`.
 - Modified: `plugins/commands.py`, `plugins/commands_downloads.py`, `plugins/index.py`, `plugins/pm_filter_callbacks.py`, `plugins/pm_filter_filtering.py`, `plugins/pm_filter_search.py`, `plugins/premium.py`, `plugins/banned.py`, `utils.py`, moved implementation modules with updated import paths, `EbookGuy/features/search/results.py`, `EbookGuy/features/downloads/start.py`, `EbookGuy/features/filters/manual.py`, `EbookGuy/features/filters/global_filters.py`, `EbookGuy/features/filters/premium_callbacks.py`, `EbookGuy/features/indexing/moderation.py`, `EbookGuy/features/indexing/requests.py`, `EbookGuy/shared/filter_parser.py`, `info.py`, and `HANDOFF.md`.
 - Currently Being Edited: none.
-- Planned to Edit: next pass should add characterization tests for critical fallback paths, then review async DB blocking patterns.
+- Planned to Edit: `database/connections_mdb.py` synchronous PyMongo operations.
 - Untouched in this exception pass: `database/users_chats_db.py`, `requirements.txt`, `Dockerfile`, and `README.md`.

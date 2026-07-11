@@ -2,7 +2,6 @@ from pyrogram import Client
 from typing import Any, Optional
 from pyrogram.types import Message
 from pyrogram.file_id import FileId
-from pyrogram.raw.types.messages import Messages
 from EbookGuy.server.exceptions import FIleNotFound
 
 
@@ -11,7 +10,7 @@ async def parse_file_id(message: "Message") -> Optional[FileId]:
     if media:
         return FileId.decode(media.file_id)
 
-async def parse_file_unique_id(message: "Messages") -> Optional[str]:
+async def parse_file_unique_id(message: "Message") -> Optional[str]:
     media = get_media_from_message(message)
     if media:
         return media.file_unique_id

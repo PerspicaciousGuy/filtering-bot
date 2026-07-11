@@ -1,11 +1,9 @@
 
-import os, logging, time
+import os, logging
 from pyrogram import Client, filters, enums
 from pyrogram.errors import RPCError
-from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant, MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty
-from utils import extract_user, get_file_id, last_online 
-from datetime import datetime
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from utils import extract_user
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)

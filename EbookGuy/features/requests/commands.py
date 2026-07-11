@@ -1,6 +1,5 @@
-from Script import script
 from pyrogram.types import *
-from pyrogram.errors import RPCError, UserIsBlocked
+from pyrogram.errors import RPCError
 from info import *
 import logging
 

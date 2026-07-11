@@ -1,7 +1,7 @@
 
 
 import logging
-from pyrogram import Client, emoji, filters
+from pyrogram import Client, emoji
 from pyrogram.errors import RPCError
 from pyrogram.errors.exceptions.bad_request_400 import QueryIdInvalid
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultCachedDocument, InlineQuery
@@ -68,7 +68,6 @@ async def answer(bot, query):
                 f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
             except (KeyError, RPCError, TypeError, ValueError):
                 logger.exception("Failed to format custom inline caption")
-                f_caption=f_caption
         if f_caption is None:
             f_caption = f"{file['file_name']}"
         results.append(

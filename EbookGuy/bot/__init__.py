@@ -1,10 +1,10 @@
 
 
-from pyrogram import Client, types
+from pyrogram import Client
+from pyrogram.types import Message
 from info import *
 from utils import temp
 from typing import Union, Optional, AsyncGenerator
-from aiohttp import web
 
 
 class EbookGuyXBot(Client):
@@ -28,7 +28,7 @@ class EbookGuyXBot(Client):
         chat_id: Union[int, str],
         limit: int,
         offset: int = 0,
-    ) -> Optional[AsyncGenerator["types.Message", None]]:
+    ) -> Optional[AsyncGenerator[Message, None]]:
         """Iterate through a chat sequentially.
         This convenience method does the same as repeatedly calling :meth:`~pyrogram.Client.get_messages` in a loop, thus saving
         you from the hassle of setting up boilerplate code. It is useful for getting the whole chat messages with a

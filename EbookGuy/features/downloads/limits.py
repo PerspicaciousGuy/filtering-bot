@@ -11,7 +11,7 @@ from info import FREE_DAILY_LIMIT, PREMIUM_DAILY_LIMIT, PREMIUM_DOWNLOAD_COOLDOW
 
 async def check_and_increment_download(user_id):
     """Check if user can download and increment count. Returns (can_download, is_premium, current_count, cooldown_remaining)"""
-    is_premium, expiry = await db.get_premium_status(user_id)
+    is_premium, _ = await db.get_premium_status(user_id)
     
     if is_premium:
         # Check premium rate limit (30 second cooldown)

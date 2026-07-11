@@ -11,7 +11,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from Script import script
 from database.ia_filterdb import get_search_results
-from info import BUTTON_MODE, CUSTOM_FILE_CAPTION, MAX_B_TN
+from info import BUTTON_MODE, MAX_B_TN
 from EbookGuy.features.search.state import FRESH, PENDING_SEARCH
 from utils import get_cap, get_settings, get_size, save_group_settings, temp
 
@@ -20,7 +20,7 @@ logger.setLevel(logging.ERROR)
 
 
 async def handle_next_page(bot, query):
-    ident, req, key, offset = query.data.split("_")
+    _, req, key, offset = query.data.split("_")
     curr_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
     if int(req) not in [query.from_user.id, 0]:
         return await query.answer(script.ALRT_TXT.format(query.from_user.first_name), show_alert=True)
@@ -152,7 +152,6 @@ async def handle_next_page(bot, query):
 
 
 async def auto_filter(client, name, msg, reply_msg, ai_search, format_type=None):
-    curr_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
     message = msg
     if message.text.startswith("/"): return  # ignore commands
     if re.findall("((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
@@ -257,10 +256,6 @@ async def auto_filter(client, name, msg, reply_msg, ai_search, format_type=None)
         btn.append(
             [InlineKeyboardButton(text="No More Pages Available",callback_data="pages")]
         )
-    cur_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
-    time_difference = timedelta(hours=cur_time.hour, minutes=cur_time.minute, seconds=(cur_time.second+(cur_time.microsecond/1000000))) - timedelta(hours=curr_time.hour, minutes=cur_time.minute, seconds=(cur_time.second+(cur_time.microsecond/1000000)))
-    remaining_seconds = "{:.2f}".format(time_difference.total_seconds())
-    
     if BUTTON_MODE:
         cap = f"<b>The Result for => {search}\n\n⚠️ After 5 minutes this message will be Automatically Deleted 🗑️\n\n</b>"
     else:

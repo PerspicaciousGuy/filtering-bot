@@ -1,6 +1,6 @@
 
 
-import datetime, time, asyncio, logging
+import datetime, time, logging
 
 from pyrogram.errors import RPCError
 from pymongo.errors import PyMongoError
@@ -22,27 +22,23 @@ async def pm_broadcast(bot, message):
         done = 0
         blocked = 0
         deleted = 0
-        failed = 0
         success = 0
         async for user in users:
             if 'id' in user:
                 pti, sh = await broadcast_messages(int(user['id']), b_msg)
                 if pti:
                     success += 1
-                elif pti == False:
+                elif pti is False:
                     if sh == "Blocked":
                         blocked += 1
                     elif sh == "Deleted":
                         deleted += 1
-                    elif sh == "Error":
-                        failed += 1
                 done += 1
                 if not done % 20:
                     await sts.edit(f"Broadcast in progress:\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")    
             else:
                 # Handle the case where 'id' key is missing in the user dictionary 
                 done += 1
-                failed += 1
                 if not done % 20:
                     await sts.edit(f"Broadcast in progress:\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")    
     

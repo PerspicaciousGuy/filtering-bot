@@ -7,7 +7,7 @@ from info import ADMINS, CHNL_LNK, REQST_CHANNEL, SUPPORT_CHAT_ID
 
 async def maybe_handle_request_status_callback(client, query):
     if query.data.startswith("show_option"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         btn = [[
                 InlineKeyboardButton("Unavailable", callback_data=f"unavailable#{from_user}"),
                 InlineKeyboardButton("Uploaded", callback_data=f"uploaded#{from_user}")
@@ -28,7 +28,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
         
     elif query.data.startswith("unavailable"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         btn = [[
                 InlineKeyboardButton("⚠️ Unavailable ⚠️", callback_data=f"unalert#{from_user}"),
                 InlineKeyboardButton("🔙 Back", callback_data=f"show_option#{from_user}")
@@ -56,7 +56,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
 
     elif query.data.startswith("uploaded"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         btn = [[
                 InlineKeyboardButton("✅ Uploaded ✅", callback_data=f"upalert#{from_user}")
               ]]
@@ -83,7 +83,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
 
     elif query.data.startswith("already_available"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         btn = [[
             InlineKeyboardButton("🟢 Already Available 🟢", callback_data=f"alalert#{from_user}")
         ]]
@@ -110,7 +110,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
 
     elif query.data.startswith("alalert"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         if int(query.from_user.id) == int(from_user):
             user = await client.get_users(from_user)
             await query.answer(f"Hey {user.first_name}, Your Request is Already Available !", show_alert=True)
@@ -118,7 +118,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
 
     elif query.data.startswith("upalert"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         if int(query.from_user.id) == int(from_user):
             user = await client.get_users(from_user)
             await query.answer(f"Hey {user.first_name}, Your Request is Uploaded !", show_alert=True)
@@ -126,7 +126,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
         
     elif query.data.startswith("unalert"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         if int(query.from_user.id) == int(from_user):
             user = await client.get_users(from_user)
             await query.answer(f"Hey {user.first_name}, Your Request is Unavailable !", show_alert=True)
@@ -134,7 +134,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
 
     elif query.data.startswith("processing"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         btn = [[
                 InlineKeyboardButton("⏳ Processing ⏳", callback_data=f"proalert#{from_user}"),
                 InlineKeyboardButton("🔙 Back", callback_data=f"show_option#{from_user}")
@@ -162,7 +162,7 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer("You don't have sufficient rights to do this !", show_alert=True)
 
     elif query.data.startswith("proalert"):
-        ident, from_user = query.data.split("#")
+        _, from_user = query.data.split("#")
         if int(query.from_user.id) == int(from_user):
             user = await client.get_users(from_user)
             await query.answer(f"Hey {user.first_name}, Your Request is Processing !", show_alert=True)
