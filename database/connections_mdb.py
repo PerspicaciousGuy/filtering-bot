@@ -36,7 +36,7 @@ async def add_connection(group_id, user_id):
         try:
             mycol.insert_one(data)
             return True
-        except:
+        except Exception:
             logger.exception('Some error occurred!', exc_info=True)
 
     else:
@@ -49,7 +49,7 @@ async def add_connection(group_id, user_id):
                 }
             )
             return True
-        except:
+        except Exception:
             logger.exception('Some error occurred!', exc_info=True)
 
         
@@ -128,7 +128,7 @@ async def delete_connection(user_id, group_id):
                 {"$set": {"active_group" : None}}
             )
         return True
-    except Exception as e:
-        logger.exception(f'Some error occurred! {e}', exc_info=True)
+    except Exception:
+        logger.exception('Failed to delete connection')
         return False
 
