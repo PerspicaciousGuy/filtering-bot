@@ -128,7 +128,7 @@ async def maybe_handle_connection_callback(client, query):
                         )
                     ]
                 )
-            except:
+            except Exception:
                 pass
         if buttons:
             await query.message.edit_text(
