@@ -1,7 +1,9 @@
 import asyncio, logging, os
 
 from Script import script
+from pyrogram.errors import RPCError
 from pyrogram.types import *
+from pymongo.errors import PyMongoError
 from database.ia_filterdb import get_file_details
 from database.users_chats_db import db
 from info import *
@@ -102,7 +104,7 @@ async def handle_do_convert_callback(client, query):
 
     except asyncio.TimeoutError:
         await query.message.edit_text("❌ <b>Conversion timed out.</b> Please try again.")
-    except Exception:
+    except (OSError, PyMongoError, RPCError):
         logger.exception("Failed to convert file")
         await query.message.edit_text("<b>Conversion failed.</b> Please try again later.")
     finally:
