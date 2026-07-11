@@ -215,7 +215,7 @@ class ByteStreamer:
                         ),
                     )
         except (TimeoutError, AttributeError):
-            pass
+            logging.getLogger(__name__).debug("Custom download worker did not return a usable result", exc_info=True)
         finally:
             logging.debug("Finished yielding file with {current_part} parts.")
             work_loads[index] -= 1
