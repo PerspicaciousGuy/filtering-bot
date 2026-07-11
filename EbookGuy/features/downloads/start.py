@@ -1,5 +1,9 @@
 import asyncio
+import logging
 import base64
+import binascii
+
+from pyrogram.errors import RPCError
 import random
 
 from Script import script
@@ -44,7 +48,7 @@ async def handle_start(client, message):
                 invite_link = await client.create_chat_invite_link(chat_id=(int(AUTH_CHANNEL)), creates_join_request=True)
             else:
                 invite_link = await client.create_chat_invite_link(int(AUTH_CHANNEL))
-        except Exception:
+        except (binascii.Error, KeyError, RPCError, TypeError, UnicodeError, ValueError):
             await message.reply_text(script.FORCE_SUB_ADMIN_ERROR)
             return
         try:
@@ -78,7 +82,7 @@ async def handle_start(client, message):
                 parse_mode=enums.ParseMode.MARKDOWN
             )
             return
-        except Exception:
+        except (binascii.Error, KeyError, RPCError, TypeError, UnicodeError, ValueError):
             return await message.reply_text(script.FORCE_SUB_ERROR)
             
     if len(message.command) == 2 and message.command[1] in ["subscribe", "error", "okay", "help"]:
@@ -94,7 +98,7 @@ async def handle_start(client, message):
  
     try:
         pre, file_id = data.split('_', 1)
-    except Exception:
+    except (binascii.Error, KeyError, RPCError, TypeError, UnicodeError, ValueError):
         file_id = data
         pre = ""
     
@@ -128,7 +132,7 @@ async def handle_start(client, message):
             if CUSTOM_FILE_CAPTION:
                 try:
                     f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
-                except Exception:
+                except (binascii.Error, KeyError, RPCError, TypeError, UnicodeError, ValueError):
                     f_caption=f_caption
             if f_caption is None:
                 f_caption = f"{' '.join(filter(lambda x: not x.startswith('[') and not x.startswith('@'), files1['file_name'].split()))}"
@@ -187,8 +191,8 @@ async def handle_start(client, message):
                 if CUSTOM_FILE_CAPTION:
                     try:
                         f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='')
-                    except Exception:
-                        pass
+                    except (binascii.Error, KeyError, RPCError, TypeError, UnicodeError, ValueError):
+                        logging.getLogger(__name__).warning("Could not format the custom file caption", exc_info=True)
                 await msg.edit_caption(caption=f_caption)
                 
                 # Show download count
@@ -202,8 +206,8 @@ async def handle_start(client, message):
                 await msg.delete()
                 await count_msg.edit_text(script.FILE_DELETED_BTN, reply_markup=InlineKeyboardMarkup(btn))
                 return
-            except Exception:
-                pass
+            except (binascii.Error, KeyError, RPCError, TypeError, UnicodeError, ValueError):
+                logging.getLogger(__name__).exception("Legacy direct-download fallback failed")
             return await message.reply(script.NO_FILE_EXIST)
         files = files_
         title = files["file_name"]
