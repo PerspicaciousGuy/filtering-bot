@@ -22,7 +22,7 @@ async def pub_is_subscribed(bot, query, channel):
             btn.append(
                 [InlineKeyboardButton(f'Join {chat.title}', url=chat.invite_link)]
             )
-        except Exception as e:
+        except Exception:
             pass
     return btn
 
@@ -38,21 +38,21 @@ async def is_subscribed(bot, query):
                     user_data = await bot.get_chat_member(AUTH_CHANNEL, query.from_user.id)
                 except UserNotParticipant:
                     pass
-                except Exception as e:
-                    logger.exception(e)
+                except Exception:
+                    logger.exception("Failed to check force-subscription member status")
                 else:
                     if user_data.status != enums.ChatMemberStatus.BANNED:
                         return True
-        except Exception as e:
-            logger.exception(e)
+        except Exception:
+            logger.exception("Failed to validate request-to-join subscription")
             return False
     else:
         try:
             user = await bot.get_chat_member(AUTH_CHANNEL, query.from_user.id)
         except UserNotParticipant:
             pass
-        except Exception as e:
-            logger.exception(e)
+        except Exception:
+            logger.exception("Failed to check subscription member status")
         else:
             if user.status != enums.ChatMemberStatus.BANNED:
                 return True
