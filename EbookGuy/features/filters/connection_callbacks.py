@@ -1,4 +1,7 @@
+import logging
+
 from pyrogram import enums
+from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.connections_mdb import (
@@ -128,8 +131,8 @@ async def maybe_handle_connection_callback(client, query):
                         )
                     ]
                 )
-            except Exception:
-                pass
+            except (RPCError, TypeError, ValueError):
+                logging.getLogger(__name__).debug("Skipping unavailable saved connection", exc_info=True)
         if buttons:
             await query.message.edit_text(
                 "Your connected group details ;\n\n",
