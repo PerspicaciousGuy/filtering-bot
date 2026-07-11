@@ -1,4 +1,4 @@
-from pyrogram.errors import UserIsBlocked
+from pyrogram.errors import RPCError, UserIsBlocked
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from Script import script
@@ -36,7 +36,7 @@ async def maybe_handle_request_status_callback(client, query):
         try:
             link = await client.create_chat_invite_link(int(REQST_CHANNEL))
             url = link.invite_link
-        except Exception:
+        except RPCError:
             url = CHNL_LNK
         btn2 = [[
                  InlineKeyboardButton('Join Channel', url=url),
@@ -63,7 +63,7 @@ async def maybe_handle_request_status_callback(client, query):
         try:
             link = await client.create_chat_invite_link(int(REQST_CHANNEL))
             url = link.invite_link
-        except Exception:
+        except RPCError:
             url = CHNL_LNK
         btn2 = [[
                  InlineKeyboardButton('Join Channel', url=url),
@@ -90,7 +90,7 @@ async def maybe_handle_request_status_callback(client, query):
         try:
             link = await client.create_chat_invite_link(int(REQST_CHANNEL))
             url = link.invite_link
-        except Exception:
+        except RPCError:
             url = CHNL_LNK
         btn2 = [[
             InlineKeyboardButton('Join Channel', url=url),
@@ -142,7 +142,7 @@ async def maybe_handle_request_status_callback(client, query):
         try:
             link = await client.create_chat_invite_link(int(REQST_CHANNEL))
             url = link.invite_link
-        except Exception:
+        except RPCError:
             url = CHNL_LNK
         btn2 = [[
                  InlineKeyboardButton('Join Channel', url=url),
