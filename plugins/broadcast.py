@@ -1,10 +1,12 @@
 
 
-import datetime, time, asyncio
+import datetime, time, asyncio, logging
 from pyrogram import Client, filters
 from database.users_chats_db import db
 from info import ADMINS
 from utils import broadcast_messages
+
+logger = logging.getLogger(__name__)
         
 @Client.on_message(filters.command("broadcast") & filters.user(ADMINS))
 async def pm_broadcast(bot, message):
@@ -43,6 +45,6 @@ async def pm_broadcast(bot, message):
     
         time_taken = datetime.timedelta(seconds=int(time.time()-start_time))
         await sts.edit(f"Broadcast Completed:\nCompleted in {time_taken} seconds.\n\nTotal Users: {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")
-    except Exception as e:
-        print(f"error: {e}")
+    except Exception:
+        logger.exception("Broadcast command failed")
         
