@@ -3,7 +3,8 @@ import logging
 import time
 
 from pyrogram import enums
-from pyrogram.errors import FloodWait, MessageNotModified
+from pyrogram.errors import FloodWait, MessageNotModified, RPCError
+from pymongo.errors import PyMongoError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import (
@@ -96,7 +97,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, resume=False):
                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⏸️ Pause', callback_data='index_cancel')]])
                         )
                     except MessageNotModified:
-                        pass
+                        logger.debug("Indexing progress message is already current")
                     last_update = time.time()
                 
                 # Save checkpoint periodically
@@ -138,7 +139,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, resume=False):
                         stats['duplicate'] += 1
                     elif code == 2:
                         stats['errors'] += 1
-                except Exception:
+                except (KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
                     stats['errors'] += 1
                     logger.exception("Failed to save indexed file")
                     
@@ -157,7 +158,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, resume=False):
             await msg.edit("▶️ Resuming indexing...")
             return await index_files_to_db(lst_msg_id, chat, msg, bot, resume=True)
             
-        except Exception:
+        except (KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
             save_checkpoint(chat, current, stats)
             logger.exception("Indexing failed unexpectedly")
             await msg.edit(
