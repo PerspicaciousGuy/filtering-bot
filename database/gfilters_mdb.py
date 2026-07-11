@@ -2,6 +2,7 @@
 
 
 import pymongo
+from pymongo.errors import PyMongoError
 from info import OTHER_DB_URI, DATABASE_NAME
 from pyrogram import enums
 import logging
@@ -25,10 +26,11 @@ async def find_gfilter(gfilters, name):
             fileid = file['file']
             try:
                 alert = file['alert']
-            except Exception:
+            except KeyError:
                 alert = None
         return reply_text, btn, alert, fileid
-    except Exception:
+    except (KeyError, PyMongoError):
+        logger.exception("Failed to find global filter")
         return None, None, None, None
 
 
@@ -41,8 +43,8 @@ async def get_gfilters(gfilters):
         for file in query:
             text = file['text']
             texts.append(text)
-    except Exception:
-        pass
+    except (KeyError, PyMongoError):
+        logger.exception("Failed to list global filters")
     return texts
 
 
@@ -55,7 +57,8 @@ async def del_allg(message, gfilters):
     try:
         mycol.drop()
         await message.edit_text(f"All gfilters has been removed !")
-    except Exception:
+    except PyMongoError:
+        logger.exception("Failed to remove all global filters")
         await message.edit_text("Couldn't remove all gfilters !")
         return
 
