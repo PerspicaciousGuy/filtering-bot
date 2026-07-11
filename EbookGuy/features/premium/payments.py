@@ -63,13 +63,13 @@ async def handle_confirm_premium_callback(client, query):
     if user_id in last_invoice_messages:
         try:
             await client.delete_messages(user_id, last_invoice_messages[user_id])
-        except:
+        except Exception:
             pass
     
     # Delete the confirmation message
     try:
         await query.message.delete()
-    except:
+    except Exception:
         pass
     
     # Create invoice for Telegram Stars payment
@@ -85,9 +85,9 @@ async def handle_confirm_premium_callback(client, query):
         # Track this invoice message
         last_invoice_messages[user_id] = invoice_msg.id
         await query.answer()
-    except Exception as e:
-        logger.error(f"Error creating invoice: {e}")
-        await query.answer(f"Error creating payment. Please try again later.", show_alert=True)
+    except Exception:
+        logger.exception("Failed to create Telegram Stars invoice")
+        await query.answer("Error creating payment. Please try again later.", show_alert=True)
 
 async def handle_pre_checkout_handler(client, query: PreCheckoutQuery):
     """Handle pre-checkout query - approve the payment"""
@@ -105,8 +105,8 @@ async def handle_pre_checkout_handler(client, query: PreCheckoutQuery):
                     return
         
         await query.answer(ok=False, error_message="Invalid payment request")
-    except Exception as e:
-        logger.error(f"Pre-checkout error: {e}")
+    except Exception:
+        logger.exception("Failed during Telegram Stars pre-checkout")
         await query.answer(ok=False, error_message="Payment verification failed")
 
 async def handle_successful_payment_handler(client, message):
@@ -147,6 +147,6 @@ Use /mystatus to check your premium status anytime.
                 logger.info(f"Premium activated: User {user_id}, {days} days, {payment.total_amount} stars")
             else:
                 await message.reply_text("❌ Error activating premium. Please contact support.")
-    except Exception as e:
-        logger.error(f"Payment processing error: {e}")
-        await message.reply_text("❌ Error processing payment. Please contact support with your payment receipt.")
+    except Exception:
+        logger.exception("Failed to process successful premium payment")
+        await message.reply_text("Error processing payment. Please contact support with your payment receipt.")
