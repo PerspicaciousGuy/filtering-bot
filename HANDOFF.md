@@ -19,26 +19,24 @@ Current domain layout:
 The local repository is on branch `main`, tracks `origin/main`, and local-only `AGENTS.md` / `agents-guidelines/` should remain ignored and untracked.
 
 ## Last Action
-Completed the second exception-cleanup batch across the codebase:
-- Removed raw exception text from user-facing Telegram replies in admin, request, conversion, indexing, premium, duplicate-cleanup, and misc info flows.
-- Replaced weak exception logging patterns such as `logger.exception(e)`, `logger.error(f"...{e}")`, and exception `print()` calls with contextual `logger.exception(...)` calls.
-- Removed unused `as e` bindings from several broad handlers where the exception object was not used.
+Completed the full Python exception-handling cleanup across 38 modified code files:
+- Replaced all remaining `except Exception` and bare handlers with failure-specific exceptions such as `RPCError`, `PyMongoError`, parsing errors, formatting errors, and filesystem errors.
+- Removed two unreachable parser fallback blocks and replaced all pass-only exception handlers with explicit fallback behavior or diagnostic logging.
+- Preserved user-facing fallback behavior while allowing genuinely unexpected programming errors to propagate.
 
-Verification completed with a targeted `rg` scan for raw `{e}` replies, weak logger calls, and exception prints; `python -m py_compile` across all modified Python files; and `git diff --check`.
-
+Verification: required exception imports succeeded; the AST audit found zero broad, bare, undefined, or pass-only handlers; `python -m compileall -q .` passed; and `git diff --check` passed. No test files or test configuration exist in the repository.
 ## In Progress
 No active file edit is in progress.
 
 ## Pending
-- Review remaining broad `except Exception` handlers that intentionally preserve control flow and decide which can be narrowed safely.
-- Add characterization tests or lightweight smoke checks before fixing behavior-sensitive bugs.
+- Add characterization tests or lightweight smoke checks for the exception fallback paths.
+- Review synchronous PyMongo calls inside async functions and move blocking work off the event loop where needed.
 - Consider later internal function-level cleanup for modules that are under 300 lines but still have large functions, such as `EbookGuy/features/search/results.py`, `EbookGuy/features/downloads/start.py`, and `EbookGuy/features/indexing/worker.py`.
 
 ## Known Issues
 - No test suite or CI workflow was found, so refactors are currently verified only by compile/static checks.
 - Broader watermark-like identifiers remain and were not renamed in this local-variable pass: `EbookGuy` package paths, `EbookGuyXBot`, `EbookGuyBot`, `MELCOW_NEW_USERS`, `MELCOW`, and `MELCOW_ENG`.
 - `EbookGuy/features/indexing/worker.py` preserves the original large `index_files_to_db` function and recursive resume behavior during FloodWait handling.
-- Bare `except:` handlers have been removed, and the first pass of raw exception exposure / weak exception logging has been cleaned. Some broad `except Exception` handlers remain where narrowing them would require behavior-sensitive review.
 - Some async database functions still call synchronous PyMongo operations directly.
 - Compile verification generated ignored `__pycache__/` files.
 
@@ -47,5 +45,5 @@ No active file edit is in progress.
 - Moved: plugin implementation modules from `plugins/` into their matching `EbookGuy/features/*` folders; root `utils_*` modules into `EbookGuy/shared/`.
 - Modified: `plugins/commands.py`, `plugins/commands_downloads.py`, `plugins/index.py`, `plugins/pm_filter_callbacks.py`, `plugins/pm_filter_filtering.py`, `plugins/pm_filter_search.py`, `plugins/premium.py`, `plugins/banned.py`, `utils.py`, moved implementation modules with updated import paths, `EbookGuy/features/search/results.py`, `EbookGuy/features/downloads/start.py`, `EbookGuy/features/filters/manual.py`, `EbookGuy/features/filters/global_filters.py`, `EbookGuy/features/filters/premium_callbacks.py`, `EbookGuy/features/indexing/moderation.py`, `EbookGuy/features/indexing/requests.py`, `EbookGuy/shared/filter_parser.py`, `info.py`, and `HANDOFF.md`.
 - Currently Being Edited: none.
-- Planned to Edit: next pass should review behavior-sensitive broad `except Exception` handlers and async DB blocking patterns.
-- Untouched: `bot.py`, `database/ia_filterdb.py`, `database/users_chats_db.py`, `requirements.txt`, `Dockerfile`, `README.md`.
+- Planned to Edit: next pass should add characterization tests for critical fallback paths, then review async DB blocking patterns.
+- Untouched in this exception pass: `database/users_chats_db.py`, `requirements.txt`, `Dockerfile`, and `README.md`.
