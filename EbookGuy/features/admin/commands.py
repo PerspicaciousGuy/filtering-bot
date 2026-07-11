@@ -1,5 +1,8 @@
 import asyncio, logging, os, re, sys
 
+from pyrogram.errors import RPCError
+from pymongo.errors import PyMongoError
+
 from pyrogram import enums
 from pyrogram.types import *
 from database.ia_filterdb import col, sec_col, unpack_new_file_id, get_bad_files
@@ -32,7 +35,7 @@ async def handle_channel_info(bot, message):
 async def handle_log_file(bot, message):
     try:
         await message.reply_document('TELEGRAM BOT.LOG')
-    except Exception:
+    except (AttributeError, IndexError, KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to send log file")
         await message.reply("Could not send the log file right now.")
 
@@ -137,7 +140,7 @@ async def handle_send_msg(bot, message):
                 await message.reply_text(f"<b>Your message has been successfully send to {user.mention}.</b>")
             else:
                 await message.reply_text("<b>This user didn't started this bot yet !</b>")
-        except Exception:
+        except (AttributeError, IndexError, KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
             logger.exception("Failed to send admin message")
             await message.reply_text("<b>Could not send that message right now.</b>")
     else:
@@ -146,7 +149,7 @@ async def handle_send_msg(bot, message):
 async def handle_deletemultiplefiles(bot, message):
     try:
         keyword = message.text.split(" ", 1)[1]
-    except Exception:
+    except (AttributeError, IndexError, KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
         return await message.reply_text(f"<b>Hey {message.from_user.mention}, Give me a keyword along with the command to delete files.</b>")
     k = await bot.send_message(chat_id=message.chat.id, text=f"<b>Fetching Files for your query {keyword} on DB... Please wait...</b>")
     files, total = await get_bad_files(keyword)
@@ -188,7 +191,7 @@ async def handle_stats(client, message):
             used_mb = round(db_stats.get('dataSize', 0) / (1024 * 1024), 2)
             storage_mb = round(db_stats.get('storageSize', 0) / (1024 * 1024), 2)
             db_info = f"\n💾 <b>Data Size:</b> {used_mb} MB\n🗜️ <b>Storage Size:</b> {storage_mb} MB"
-        except Exception:
+        except (AttributeError, IndexError, KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
             db_info = "\n⚠️ DB stats unavailable"
 
         text = (
@@ -205,7 +208,7 @@ async def handle_stats(client, message):
             f"🗄️ <b>Database</b>{db_info}"
         )
         await msg.edit_text(text)
-    except Exception:
+    except (AttributeError, IndexError, KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to fetch admin stats")
         await msg.edit_text("<b>Error fetching stats. Please try again later.</b>")
 
