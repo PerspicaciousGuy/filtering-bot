@@ -1,7 +1,9 @@
 import logging
 import re
 
+from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardMarkup
+from pymongo.errors import PyMongoError
 
 from database.connections_mdb import active_connection
 from info import *
@@ -178,7 +180,7 @@ async def global_filters(client, message, text=False):
                                     reply_msg = await message.reply_text(f"<b><i>Searching For {message.text} 🔍</i></b>")
                                     await auto_filter(client, message.text, message, reply_msg, ai_search)
 
-                except Exception:
+                except (KeyError, PyMongoError, RPCError, SyntaxError, TypeError, ValueError):
                     logger.exception("Failed to process global filter")
                 break
     else:
