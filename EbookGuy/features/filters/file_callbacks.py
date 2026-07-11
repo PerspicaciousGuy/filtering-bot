@@ -18,7 +18,7 @@ async def maybe_handle_file_callback(client, query):
         clicked = query.from_user.id
         try:
             typed = query.message.reply_to_message.from_user.id
-        except:
+        except Exception:
             typed = query.from_user.id
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
@@ -37,8 +37,8 @@ async def maybe_handle_file_callback(client, query):
                                                        filename='' if title is None else title,
                                                        filesize='' if size is None else size,
                                                        duration='')
-            except Exception as e:
-                logger.exception(e)
+            except Exception:
+                logger.exception("Failed to format custom file callback caption")
             f_caption = f_caption
         if f_caption is None:
             f_caption = f"{files['file_name']}"
@@ -53,7 +53,7 @@ async def maybe_handle_file_callback(client, query):
             await query.answer('Unblock the bot mahn !', show_alert=True)
         except PeerIdInvalid:
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={ident}_{file_id}")
-        except Exception as e:
+        except Exception:
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={ident}_{file_id}")
             
     elif query.data.startswith("sendfiles"):
@@ -67,8 +67,8 @@ async def maybe_handle_file_callback(client, query):
             await query.answer('Unblock the bot mahn !', show_alert=True)
         except PeerIdInvalid:
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={pre}_{key}")
-        except Exception as e:
-            logger.exception(e)
+        except Exception:
+            logger.exception("Failed to answer sendfiles callback")
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={pre}_{key}")
 
     elif query.data.startswith("unmuteme"):
@@ -87,9 +87,9 @@ async def maybe_handle_file_callback(client, query):
                 await query.answer("Unmuted Successfully !", show_alert=True)
                 try:
                     await query.message.delete()
-                except:
+                except Exception:
                     return
-        except:
+        except Exception:
             await query.answer("Not For Your My Dear", show_alert=True)
        
     elif query.data.startswith("del"):
@@ -110,8 +110,8 @@ async def maybe_handle_file_callback(client, query):
                                                        filename='' if title is None else title,
                                                        filesize='' if size is None else size,
                                                        duration='')
-            except Exception as e:
-                logger.exception(e)
+            except Exception:
+                logger.exception("Failed to format custom delete callback caption")
             f_caption = f_caption
         if f_caption is None:
             f_caption = f"{files['file_name']}"
@@ -151,9 +151,9 @@ async def maybe_handle_file_callback(client, query):
                     deleted += 1
                     if deleted % 50 == 0:
                         await query.message.edit_text(f"<b>Process started for deleting files from DB. Successfully deleted {str(deleted)} files from DB for your query {keyword} !\n\nPlease wait...</b>")
-            except Exception as e:
-                logger.exception(e)
-                await query.message.edit_text(f'Error: {e}')
+            except Exception:
+                logger.exception("Failed while deleting files from database")
+                await query.message.edit_text("Error deleting files. Please try again later.")
             else:
                 await query.message.edit_text(f"<b>Process Completed for file deletion !\n\nSuccessfully deleted {str(deleted)} files from database for your query {keyword}.</b>")
     else:
