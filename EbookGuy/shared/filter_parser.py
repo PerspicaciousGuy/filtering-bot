@@ -62,10 +62,7 @@ def gfilterparser(text, keyword):
     else:
         note_data += text[prev:]
 
-    try:
-        return note_data, buttons, alerts
-    except Exception:
-        return note_data, buttons, None
+    return note_data, buttons, alerts
 
 def parser(text, keyword):
     if "buttonalert" in text:
@@ -118,7 +115,4 @@ def parser(text, keyword):
     else:
         note_data += text[prev:]
 
-    try:
-        return note_data, buttons, alerts
-    except Exception:
-        return note_data, buttons, None
+    return note_data, buttons, alerts
