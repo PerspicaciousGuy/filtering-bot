@@ -4,6 +4,7 @@ import asyncio
 import logging
 from info import *
 from pyrogram import Client
+from pyrogram.errors import RPCError
 from EbookGuy.util.config_parser import TokenParser
 from EbookGuy.bot import multi_clients, work_loads, EbookGuyBot
 
@@ -33,8 +34,8 @@ async def initialize_clients():
             ).start()
             work_loads[client_id] = 0
             return client_id, client
-        except Exception:
-            logging.error(f"Failed starting Client - {client_id} Error:", exc_info=True)
+        except RPCError:
+            logging.exception("Failed starting client %s", client_id)
     
     clients = await asyncio.gather(*[start_client(i, token) for i, token in all_tokens.items()])
     multi_clients.update(dict(clients))
