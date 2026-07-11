@@ -78,18 +78,18 @@ async def start():
     time = now.strftime("%H:%M:%S %p")
     try:
         await EbookGuyBot.send_message(chat_id=LOG_CHANNEL, text=script.RESTART_TXT.format(today, time))
-    except:
+    except Exception:
         print("Make Your Bot Admin In Log Channel With Full Rights")
     for ch in CHANNELS:
         try:
             k = await EbookGuyBot.send_message(chat_id=ch, text="**Bot Restarted**")
             await k.delete()
-        except:
+        except Exception:
             print("Make Your Bot Admin In File Channels With Full Rights")
     try:
         k = await EbookGuyBot.send_message(chat_id=AUTH_CHANNEL, text="**Bot Restarted**")
         await k.delete()
-    except:
+    except Exception:
         print("Make Your Bot Admin In Force Subscribe Channel With Full Rights")
     await idle()
 
