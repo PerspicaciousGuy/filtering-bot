@@ -1,6 +1,9 @@
 
 
+import logging
+
 from pyrogram import Client, filters
+from pyrogram.errors import RPCError
 from utils import temp
 from pyrogram.types import Message
 from database.users_chats_db import db
@@ -37,6 +40,6 @@ async def grp_bd(bot, message):
         reply_markup=reply_markup)
     try:
         await k.pin()
-    except Exception:
-        pass
+    except RPCError:
+        logging.getLogger(__name__).debug("Restriction notice could not be pinned", exc_info=True)
     await bot.leave_chat(message.chat.id)
