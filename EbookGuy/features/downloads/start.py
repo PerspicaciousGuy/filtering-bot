@@ -44,7 +44,7 @@ async def handle_start(client, message):
                 invite_link = await client.create_chat_invite_link(chat_id=(int(AUTH_CHANNEL)), creates_join_request=True)
             else:
                 invite_link = await client.create_chat_invite_link(int(AUTH_CHANNEL))
-        except Exception as e:
+        except Exception:
             await message.reply_text(script.FORCE_SUB_ADMIN_ERROR)
             return
         try:
@@ -78,7 +78,7 @@ async def handle_start(client, message):
                 parse_mode=enums.ParseMode.MARKDOWN
             )
             return
-        except Exception as e:
+        except Exception:
             return await message.reply_text(script.FORCE_SUB_ERROR)
             
     if len(message.command) == 2 and message.command[1] in ["subscribe", "error", "okay", "help"]:
@@ -94,7 +94,7 @@ async def handle_start(client, message):
  
     try:
         pre, file_id = data.split('_', 1)
-    except:
+    except Exception:
         file_id = data
         pre = ""
     
