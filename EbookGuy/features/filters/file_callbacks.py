@@ -1,7 +1,8 @@
 import asyncio
 import logging
 
-from pyrogram.errors import PeerIdInvalid, UserIsBlocked
+from pyrogram.errors import PeerIdInvalid, RPCError, UserIsBlocked
+from pymongo.errors import PyMongoError
 from pyrogram.types import InlineKeyboardMarkup
 
 from database.ia_filterdb import col, get_bad_files, get_file_details, sec_col
@@ -18,7 +19,7 @@ async def maybe_handle_file_callback(client, query):
         clicked = query.from_user.id
         try:
             typed = query.message.reply_to_message.from_user.id
-        except Exception:
+        except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
             typed = query.from_user.id
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
@@ -37,7 +38,7 @@ async def maybe_handle_file_callback(client, query):
                                                        filename='' if title is None else title,
                                                        filesize='' if size is None else size,
                                                        duration='')
-            except Exception:
+            except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
                 logger.exception("Failed to format custom file callback caption")
             f_caption = f_caption
         if f_caption is None:
@@ -53,7 +54,7 @@ async def maybe_handle_file_callback(client, query):
             await query.answer('Unblock the bot mahn !', show_alert=True)
         except PeerIdInvalid:
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={ident}_{file_id}")
-        except Exception:
+        except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={ident}_{file_id}")
             
     elif query.data.startswith("sendfiles"):
@@ -67,7 +68,7 @@ async def maybe_handle_file_callback(client, query):
             await query.answer('Unblock the bot mahn !', show_alert=True)
         except PeerIdInvalid:
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={pre}_{key}")
-        except Exception:
+        except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
             logger.exception("Failed to answer sendfiles callback")
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start={pre}_{key}")
 
@@ -87,9 +88,9 @@ async def maybe_handle_file_callback(client, query):
                 await query.answer("Unmuted Successfully !", show_alert=True)
                 try:
                     await query.message.delete()
-                except Exception:
+                except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
                     return
-        except Exception:
+        except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
             await query.answer("Not For Your My Dear", show_alert=True)
        
     elif query.data.startswith("del"):
@@ -110,7 +111,7 @@ async def maybe_handle_file_callback(client, query):
                                                        filename='' if title is None else title,
                                                        filesize='' if size is None else size,
                                                        duration='')
-            except Exception:
+            except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
                 logger.exception("Failed to format custom delete callback caption")
             f_caption = f_caption
         if f_caption is None:
@@ -151,7 +152,7 @@ async def maybe_handle_file_callback(client, query):
                     deleted += 1
                     if deleted % 50 == 0:
                         await query.message.edit_text(f"<b>Process started for deleting files from DB. Successfully deleted {str(deleted)} files from DB for your query {keyword} !\n\nPlease wait...</b>")
-            except Exception:
+            except (AttributeError, KeyError, PyMongoError, RPCError, TypeError, ValueError):
                 logger.exception("Failed while deleting files from database")
                 await query.message.edit_text("Error deleting files. Please try again later.")
             else:
