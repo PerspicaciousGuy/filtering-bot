@@ -1,6 +1,7 @@
 
 import os, logging, time
 from pyrogram import Client, filters, enums
+from pyrogram.errors import RPCError
 from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant, MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty
 from utils import extract_user, get_file_id, last_online 
 from datetime import datetime
@@ -34,7 +35,7 @@ async def who_is(client, message):
     from_user_id, _ = extract_user(message)
     try:
         from_user = await client.get_users(from_user_id)
-    except Exception:
+    except (RPCError, TypeError, ValueError):
         logger.exception("Failed to fetch user info")
         await status_message.edit("Could not fetch user info right now.")
         return
