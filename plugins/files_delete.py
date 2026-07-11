@@ -1,6 +1,9 @@
 
 
 import re, logging
+
+from pyrogram.errors import RPCError
+from pymongo.errors import PyMongoError
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from info import DELETE_CHANNELS, ADMINS
@@ -81,10 +84,10 @@ async def deletemultiplemedia(bot, message):
         
         try:
             await message.reply_text(reply_text)
-        except Exception:
+        except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
             logger.exception("Failed to send file deletion reply")
 
-    except Exception:
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("File deletion handler failed")
 
 
@@ -133,7 +136,7 @@ async def find_duplicates(bot, message):
         
         await status_msg.edit_text(report, reply_markup=InlineKeyboardMarkup(btn))
         
-    except Exception:
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to find duplicate files")
         await status_msg.edit_text("<b>Error scanning duplicates.</b> Please try again later.")
 
@@ -178,6 +181,6 @@ async def clean_duplicates(bot, query):
         )
         logger.info(f"Cleaned {total_removed} duplicate files")
         
-    except Exception:
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to clean duplicate files")
         await query.message.edit_text("<b>Error cleaning duplicates.</b> Please try again later.")
