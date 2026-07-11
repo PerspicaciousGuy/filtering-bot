@@ -1,4 +1,4 @@
-import asyncio, os
+import asyncio, logging, os
 
 from Script import script
 from pyrogram.types import *
@@ -6,6 +6,8 @@ from database.ia_filterdb import get_file_details
 from database.users_chats_db import db
 from info import *
 from utils import get_size
+
+logger = logging.getLogger(__name__)
 
 async def handle_convert_menu_callback(client, query):
     _, pre, file_id = query.data.split("#", 2)
@@ -100,8 +102,9 @@ async def handle_do_convert_callback(client, query):
 
     except asyncio.TimeoutError:
         await query.message.edit_text("❌ <b>Conversion timed out.</b> Please try again.")
-    except Exception as e:
-        await query.message.edit_text(f"❌ <b>Conversion error:</b> <code>{e}</code>")
+    except Exception:
+        logger.exception("Failed to convert file")
+        await query.message.edit_text("<b>Conversion failed.</b> Please try again later.")
     finally:
         for path in [input_path, output_path]:
             if os.path.exists(path):
