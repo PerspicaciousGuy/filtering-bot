@@ -1,4 +1,4 @@
-import glob, logging, logging.config, asyncio
+import asyncio, logging, logging.config
 from aiohttp import web
 import pytz
 
@@ -7,6 +7,7 @@ logging.config.fileConfig('logging.conf')
 logging.getLogger().setLevel(logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("cinemagoer").setLevel(logging.ERROR)
+logger = logging.getLogger(__name__)
 
 from pyrogram import idle
 from pyrogram.errors import RPCError
@@ -23,8 +24,7 @@ from EbookGuy.util.keepalive import ping_server
 from EbookGuy.bot.clients import initialize_clients
 from database.ia_filterdb import col, sec_col
 
-ppath = "plugins/*.py"
-files = glob.glob(ppath)
+
 EbookGuyBot.start()
 loop = asyncio.get_event_loop()
 
@@ -41,8 +41,7 @@ async def web_server():
     logging.info(f"Web server started on port {PORT}")
 
 async def start():
-    print('\n')
-    print('Initalizing Your Bot')
+    logger.info("Initializing bot")
     await initialize_clients()
     
     if ON_HEROKU:
@@ -64,7 +63,7 @@ async def start():
     async def refresh_lib_count():
         while True:
             try:
-                total = col.count_documents({}) + sec_col.count_documents({})
+                total = await col.count_documents({}) + await sec_col.count_documents({})
                 temp.LIB_COUNT = f"{total // 1000}K" if total >= 1000 else str(total)
             except PyMongoError:
                 logging.exception("Failed to refresh cached library count")
