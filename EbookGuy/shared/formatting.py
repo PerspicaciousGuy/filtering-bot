@@ -1,7 +1,11 @@
+import logging
+
 from pyrogram import enums
 
-from info import MAX_LIST_ELM
+from info import CUSTOM_FILE_CAPTION, MAX_LIST_ELM
 from EbookGuy.shared.state import temp
+
+logger = logging.getLogger(__name__)
 
 
 def get_size(size):
@@ -12,6 +16,25 @@ def get_size(size):
         i += 1
         size /= 1024.0
     return "%.2f %s" % (size, units[i])
+
+
+def format_file_caption(file_name, file_size, file_caption=None):
+    """Apply the configured file-caption template to normalized metadata."""
+    if not CUSTOM_FILE_CAPTION:
+        return file_caption
+    try:
+        return CUSTOM_FILE_CAPTION.format(
+            file_name=file_name or "",
+            file_size=file_size or "",
+            file_caption=file_caption or "",
+            filename=file_name or "",
+            filesize=file_size or "",
+            duration="",
+        )
+    except (AttributeError, KeyError, TypeError, ValueError):
+        logger.warning("Could not format the custom file caption", exc_info=True)
+        return file_caption
+
 
 def split_list(l, n):
     for i in range(0, len(l), n):
@@ -47,7 +70,7 @@ def last_online(from_user):
     return time
 
 
-async def get_cap(settings, remaining_seconds, files, query, total_results, search, pre='file'):
+def get_cap(files, search, pre='file'):
     cap = f"<b>The Result for => {search}\n\n⚠️ After 5 minutes this message will be Automatically Deleted 🗑️\n\n</b>"
     cap += "<b><u>📚 Your Book Files 👇</u></b>\n\n"
     for file in files:
