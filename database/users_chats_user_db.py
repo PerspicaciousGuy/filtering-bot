@@ -74,25 +74,25 @@ class UserRecordsMixin:
 
     async def get_thumbnail(self, id):
         user = await self.col.find_one({'id': int(id)})
-        return user.get('file_id', None)
+        return (user or {}).get('file_id')
 
     async def set_caption(self, id, caption):
         await self.col.update_one({'id': int(id)}, {'$set': {'caption': caption}})
 
     async def get_caption(self, id):
         user = await self.col.find_one({'id': int(id)})
-        return user.get('caption', None)
+        return (user or {}).get('caption')
 
     async def set_msg_command(self, id, com):
         await self.col.update_one({'id': int(id)}, {'$set': {'message_command': com}})
 
     async def get_msg_command(self, id):
         user = await self.col.find_one({'id': int(id)})
-        return user.get('message_command', None)
+        return (user or {}).get('message_command')
 
     async def set_save(self, id, save):
         await self.col.update_one({'id': int(id)}, {'$set': {'save': save}})
 
     async def get_save(self, id):
         user = await self.col.find_one({'id': int(id)})
-        return user.get('save', False) 
+        return (user or {}).get('save', False)
