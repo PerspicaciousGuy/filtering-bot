@@ -3,13 +3,14 @@
 import asyncio
 import logging
 
-from info import API_HASH, API_ID, SLEEP_THRESHOLD
+from info import API_HASH, API_ID
 from pyrogram import Client
 from pyrogram.errors import RPCError
 from EbookGuy.util.config_parser import TokenParser
 from EbookGuy.bot import multi_clients, work_loads, EbookGuyBot
 
 logger = logging.getLogger(__name__)
+CLIENT_SLEEP_THRESHOLD = 5
 
 
 async def initialize_clients():
@@ -31,7 +32,7 @@ async def initialize_clients():
                 api_id=API_ID,
                 api_hash=API_HASH,
                 bot_token=token,
-                sleep_threshold=SLEEP_THRESHOLD,
+                sleep_threshold=CLIENT_SLEEP_THRESHOLD,
                 no_updates=True,
                 in_memory=True
             ).start()
