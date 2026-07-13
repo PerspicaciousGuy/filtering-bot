@@ -12,11 +12,11 @@ from database.ia_filterdb import get_file_details
 from EbookGuy.features.downloads.callbacks import get_file_again_markup
 from EbookGuy.features.downloads.limits import (
     check_and_increment_download,
+    download_count_text,
     send_auto_delete_message,
     send_download_limit_message,
 )
 from EbookGuy.shared.formatting import format_file_caption
-from info import FREE_DAILY_LIMIT
 from utils import get_size, temp
 
 
@@ -48,19 +48,15 @@ def _parse_payload(data):
     return tuple(data.split("_", 1))
 
 
-def _download_count_text(is_premium, count):
-    if is_premium:
-        return script.DOWNLOAD_COUNT_PREMIUM
-    return script.DOWNLOAD_COUNT.format(count, FREE_DAILY_LIMIT)
-
-
-async def _download_permission(message):
-    state = await check_and_increment_download(message.from_user.id)
-    can_download, is_premium, count, cooldown = state
-    if not can_download:
-        await send_download_limit_message(message, is_premium, cooldown)
+async def _download_permission(message, file_size=0):
+    access = await check_and_increment_download(
+        message.from_user.id,
+        file_size,
+    )
+    if not access.is_allowed:
+        await send_download_limit_message(message, access)
         return None
-    return is_premium, count
+    return access
 
 
 async def send_bulk_files(client, message, payload):
@@ -69,8 +65,9 @@ async def send_bulk_files(client, message, payload):
     if not files:
         await message.reply(script.NO_FILE_EXIST)
         return
-    permission = await _download_permission(message)
-    if permission is None:
+    largest_file = max(int(file.get("file_size") or 0) for file in files)
+    access = await _download_permission(message, largest_file)
+    if access is None:
         return
     sent_messages = []
     for file in files:
@@ -80,8 +77,7 @@ async def send_bulk_files(client, message, payload):
             protect_content=prefix == "allfilesp",
             reply_markup=None,
         ))
-    is_premium, count = permission
-    await message.reply_text(_download_count_text(is_premium, count))
+    await message.reply_text(download_count_text(access))
     await send_auto_delete_message(client, message.from_user.id, sent_messages)
 
 
@@ -93,8 +89,8 @@ def _decode_legacy_payload(payload):
 
 async def _send_legacy_file(client, message, payload):
     prefix, file_id = _decode_legacy_payload(payload)
-    permission = await _download_permission(message)
-    if permission is None:
+    access = await _download_permission(message)
+    if access is None:
         return
     sent = await client.send_cached_media(
         chat_id=message.from_user.id,
@@ -105,9 +101,8 @@ async def _send_legacy_file(client, message, payload):
     media = getattr(sent, sent.media.value)
     caption = format_file_caption(media.file_name, get_size(media.file_size))
     await sent.edit_caption(caption=caption or f"<code>{media.file_name}</code>")
-    is_premium, count = permission
     count_message = await sent.reply(
-        _download_count_text(is_premium, count)
+        download_count_text(access)
         + "\n\n"
         + script.IMPORTANT_DELETE_MSG
     )
