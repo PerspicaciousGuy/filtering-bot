@@ -4,10 +4,10 @@ from Script import script
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import get_file_details
-from info import FREE_DAILY_LIMIT
 from EbookGuy.features.downloads.limits import (
     answer_download_limit_callback,
     check_and_increment_download,
+    download_count_text,
 )
 from EbookGuy.shared.formatting import format_file_caption
 from utils import get_size
@@ -19,14 +19,6 @@ def _fallback_caption(title):
         for part in title.split()
         if not part.startswith("[") and not part.startswith("@")
     )
-
-
-def _download_count_text(is_premium, count):
-    if is_premium:
-        prefix = script.DOWNLOAD_COUNT_PREMIUM
-    else:
-        prefix = script.DOWNLOAD_COUNT.format(count, FREE_DAILY_LIMIT)
-    return prefix + "\n\n" + script.IMPORTANT_DELETE_MSG
 
 
 def get_file_again_markup(file_id):
@@ -43,16 +35,13 @@ def get_file_again_markup(file_id):
 async def handle_download_book_callback(client, query):
     _, pre, file_id = query.data.split("#", 2)
     user_id = query.from_user.id
-    can_download, is_premium, count, cooldown = (
-        await check_and_increment_download(user_id)
-    )
-    if not can_download:
-        await answer_download_limit_callback(query, is_premium, cooldown)
-        return
-
     file = await get_file_details(file_id)
     if not file:
         return await query.answer("File not found.", show_alert=True)
+    access = await check_and_increment_download(user_id, file["file_size"])
+    if not access.is_allowed:
+        await answer_download_limit_callback(query, access)
+        return
 
     title = file["file_name"]
     caption = format_file_caption(
@@ -68,7 +57,7 @@ async def handle_download_book_callback(client, query):
         protect_content=pre == "filep",
     )
     count_message = await message.reply(
-        _download_count_text(is_premium, count)
+        download_count_text(access) + "\n\n" + script.IMPORTANT_DELETE_MSG
     )
     await asyncio.sleep(600)
     await message.delete()
