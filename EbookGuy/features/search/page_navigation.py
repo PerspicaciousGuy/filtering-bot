@@ -4,7 +4,7 @@ from pyrogram.errors import MessageNotModified
 from pyrogram.types import InlineKeyboardMarkup
 
 from Script import script
-from database.ia_filterdb import SearchRequest, get_search_results
+from database.search_repository import SearchRequest, get_search_results
 from EbookGuy.features.search.models import NextPageView, PageRequest
 from EbookGuy.features.search.pagination import (
     PaginationState,
@@ -14,8 +14,9 @@ from EbookGuy.features.search.pagination import (
     normalize_offset,
 )
 from EbookGuy.features.search.state import FRESH
+from EbookGuy.shared.global_settings import get_global_settings
 from info import BUTTON_MODE
-from utils import get_cap, get_settings, temp
+from utils import get_cap, temp
 
 
 logger = logging.getLogger(__name__)
@@ -53,17 +54,24 @@ async def _page_request(query):
 
 
 async def _page_view(query, request):
+    global_settings = await get_global_settings()
+    if not global_settings["search_enabled"]:
+        await query.answer("Search is temporarily disabled.", show_alert=True)
+        return None
+    page_size = get_page_size(global_settings)
     files, next_offset, total = await get_search_results(SearchRequest(
         request.search,
+        max_results=page_size,
         offset=request.offset,
         format_type=request.format_type,
+        result_limit=int(global_settings["max_search_results"]),
+        use_caption_filter=bool(global_settings["use_caption_filter"]),
     ))
     if not files:
         return None
     temp.GETALL[request.key] = files
     temp.SHORT[query.from_user.id] = query.message.chat.id
-    settings = await get_settings(query.message.chat.id)
-    prefix = "filep" if settings["file_secure"] else "file"
+    prefix = "filep" if global_settings["protect_content"] else "file"
     buttons = build_file_buttons(files, prefix) if BUTTON_MODE else []
     buttons.append(build_pagination_row(PaginationState(
         requester_id=request.requester_id,
@@ -71,9 +79,15 @@ async def _page_view(query, request):
         offset=request.offset,
         next_offset=normalize_offset(next_offset),
         total_results=total,
-        page_size=await get_page_size(settings, query.message.chat.id),
+        page_size=page_size,
     )))
-    return NextPageView(files, request.search, prefix, buttons)
+    return NextPageView(
+        files,
+        request.search,
+        prefix,
+        buttons,
+        int(global_settings["search_result_expiry_seconds"]),
+    )
 
 
 async def _render_next_page(query, view):
@@ -83,7 +97,11 @@ async def _render_next_page(query, view):
             await query.edit_message_reply_markup(reply_markup=reply_markup)
         else:
             await query.message.edit_text(
-                text=get_cap(view.files, view.search, view.prefix),
+                text=get_cap(
+                    view.files,
+                    view.search,
+                    (view.prefix, view.expiry_seconds),
+                ),
                 reply_markup=reply_markup,
                 disable_web_page_preview=True,
             )
