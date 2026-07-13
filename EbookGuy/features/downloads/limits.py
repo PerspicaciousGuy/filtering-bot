@@ -1,13 +1,30 @@
 import asyncio
-import logging
 import datetime
+import logging
+from dataclasses import dataclass
 
 from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from Script import script
 from database.users_chats_db import db
-from info import FREE_DAILY_LIMIT, PREMIUM_DAILY_LIMIT, PREMIUM_DOWNLOAD_COOLDOWN
+from EbookGuy.shared.global_settings import get_global_settings
+
+
+BYTES_PER_MB = 1024 * 1024
+
+
+@dataclass(frozen=True)
+class DownloadAccess:
+    """Result of evaluating and optionally consuming a download allowance."""
+
+    is_allowed: bool
+    is_premium: bool
+    count: int
+    daily_limit: int
+    cooldown_remaining: int = 0
+    file_size_limit_mb: int = 0
+    denial_reason: str = ""
 
 
 def _premium_upgrade_markup():
@@ -21,86 +38,106 @@ def _premium_upgrade_markup():
     )
 
 
-async def send_download_limit_message(message, is_premium, cooldown):
+def _limit_message(access):
+    if access.denial_reason == "file_size":
+        return (
+            "<b>File Too Large</b>\n\n"
+            f"Your maximum file size is <b>{access.file_size_limit_mb} MB</b>."
+        )
+    if access.cooldown_remaining > 0:
+        return (
+            "<b>Rate Limited</b>\n\n"
+            f"Please wait <b>{access.cooldown_remaining} seconds</b> "
+            "before your next download."
+        )
+    plan = "premium" if access.is_premium else "free"
+    return (
+        "<b>Daily Limit Reached</b>\n\n"
+        f"You have reached the {plan} limit of "
+        f"<b>{access.daily_limit} download(s) per day</b>."
+    )
+
+
+async def send_download_limit_message(message, access):
     """Reply with the applicable rich download-denial message."""
-    if is_premium and cooldown > 0:
-        await message.reply_text(
-            f"\u23f1\ufe0f <b>Rate Limited</b>\n\n"
-            f"Please wait <b>{cooldown} seconds</b> before your next download.\n\n"
-            f"<i>Premium users can download {PREMIUM_DAILY_LIMIT} books/day "
-            f"with {PREMIUM_DOWNLOAD_COOLDOWN} second gaps.</i>"
-        )
-        return
-    if is_premium:
-        await message.reply_text(
-            f"\U0001f4da <b>Daily Limit Reached</b>\n\n"
-            f"You have reached your premium limit of {PREMIUM_DAILY_LIMIT} "
-            "downloads today.\n\nLimit resets at midnight."
-        )
-        return
     await message.reply_text(
-        text=(
-            "\U0001f4da <b>Daily Limit Reached</b>\n\n"
-            f"Free users can download <b>{FREE_DAILY_LIMIT} book(s) per day</b>.\n\n"
-            f"Upgrade to premium for <b>{PREMIUM_DAILY_LIMIT} downloads/day</b>!"
+        text=_limit_message(access),
+        reply_markup=(
+            None if access.is_premium else _premium_upgrade_markup()
         ),
-        reply_markup=_premium_upgrade_markup(),
     )
 
 
-async def answer_download_limit_callback(query, is_premium, cooldown):
+async def answer_download_limit_callback(query, access):
     """Answer a callback with the applicable download-denial response."""
-    if is_premium and cooldown > 0:
-        await query.answer(
-            f"\u23f1\ufe0f Wait {cooldown}s before next download.",
-            show_alert=True,
-        )
-        return
-    if is_premium:
-        await query.answer(
-            f"\U0001f4da Daily limit reached ({PREMIUM_DAILY_LIMIT}/day). "
-            "Resets at midnight.",
-            show_alert=True,
-        )
-        return
-    await query.message.edit_text(
-        text=(
-            "\U0001f4da <b>Daily Limit Reached</b>\n\n"
-            f"Free users can download <b>{FREE_DAILY_LIMIT} book(s) per day</b>.\n\n"
-            f"Upgrade to premium for <b>{PREMIUM_DAILY_LIMIT} downloads/day</b>!"
-        ),
-        reply_markup=_premium_upgrade_markup(),
+    await query.answer(
+        _limit_message(access).replace("<b>", "").replace("</b>", ""),
+        show_alert=True,
     )
 
 
-async def check_and_increment_download(user_id):
+def _size_denial(is_premium, file_size, limits):
+    daily_limit, size_limit = limits
+    if size_limit <= 0 or file_size <= size_limit * BYTES_PER_MB:
+        return None
+    return DownloadAccess(
+        False,
+        is_premium,
+        0,
+        daily_limit,
+        file_size_limit_mb=size_limit,
+        denial_reason="file_size",
+    )
+
+
+async def _check_premium_download(user_id, file_size, settings):
+    daily_limit = int(settings["premium_daily_limit"])
+    size_limit = int(settings["premium_max_file_size_mb"])
+    denied = _size_denial(True, file_size, (daily_limit, size_limit))
+    if denied:
+        return denied
+    cooldown = int(settings["premium_download_cooldown_seconds"])
+    last_download = await db.get_user_last_download_time(user_id)
+    if last_download and cooldown > 0:
+        elapsed = (datetime.datetime.now() - last_download).total_seconds()
+        if elapsed < cooldown:
+            return DownloadAccess(
+                False, True, 0, daily_limit, cooldown - int(elapsed)
+            )
+    current = await db.get_daily_downloads(user_id)
+    if daily_limit > 0 and current >= daily_limit:
+        return DownloadAccess(False, True, current, daily_limit)
+    count = await db.increment_downloads(user_id)
+    await db.set_user_last_download_time(user_id)
+    return DownloadAccess(True, True, count, daily_limit)
+
+
+async def _check_free_download(user_id, file_size, settings):
+    daily_limit = int(settings["free_daily_limit"])
+    size_limit = int(settings["free_max_file_size_mb"])
+    denied = _size_denial(False, file_size, (daily_limit, size_limit))
+    if denied:
+        return denied
+    current = await db.get_daily_downloads(user_id)
+    if daily_limit > 0 and current >= daily_limit:
+        return DownloadAccess(False, False, current, daily_limit)
+    count = await db.increment_downloads(user_id)
+    return DownloadAccess(True, False, count, daily_limit)
+
+
+async def check_and_increment_download(user_id, file_size=0):
     """Check the user's limits, increment an allowed download, and return its state."""
+    settings = await get_global_settings()
     is_premium, _ = await db.get_premium_status(user_id)
-
     if is_premium:
-        last_download = await db.get_user_last_download_time(user_id)
-        if last_download:
-            time_since_download = (
-                datetime.datetime.now() - last_download
-            ).total_seconds()
-            if time_since_download < PREMIUM_DOWNLOAD_COOLDOWN:
-                remaining = PREMIUM_DOWNLOAD_COOLDOWN - int(time_since_download)
-                return False, True, 0, remaining
+        return await _check_premium_download(user_id, file_size, settings)
+    return await _check_free_download(user_id, file_size, settings)
 
-        current_downloads = await db.get_daily_downloads(user_id)
-        if current_downloads >= PREMIUM_DAILY_LIMIT:
-            return False, True, current_downloads, 0
 
-        new_count = await db.increment_downloads(user_id)
-        await db.set_user_last_download_time(user_id)
-        return True, True, new_count, 0
-
-    current_downloads = await db.get_daily_downloads(user_id)
-    if current_downloads >= FREE_DAILY_LIMIT:
-        return False, False, current_downloads, 0
-
-    new_count = await db.increment_downloads(user_id)
-    return True, False, new_count, 0
+def download_count_text(access):
+    """Format the consumed daily allowance after a successful download."""
+    limit = access.daily_limit or "Unlimited"
+    return f"<b>Downloads today:</b> <code>{access.count}/{limit}</code>"
 
 
 async def send_auto_delete_message(client, user_id, filesarr):
