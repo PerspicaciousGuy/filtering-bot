@@ -1,7 +1,9 @@
 import asyncio
 import logging
-from info import *
+from dataclasses import dataclass
 from typing import Dict, Union
+
+from info import LOG_CHANNEL
 from EbookGuy.bot import work_loads
 from pyrogram import Client, utils, raw
 from EbookGuy.util.file_properties import get_file_ids
@@ -9,6 +11,64 @@ from pyrogram.session import Session, Auth
 from pyrogram.errors import AuthBytesInvalid
 from EbookGuy.server.exceptions import FIleNotFound
 from pyrogram.file_id import FileId, FileType, ThumbnailSource
+
+
+@dataclass(frozen=True)
+class FileChunkRequest:
+    file_id: FileId
+    client_index: int
+    offset: int
+    first_part_cut: int
+    last_part_cut: int
+    part_count: int
+    chunk_size: int
+
+
+async def _authorize_media_session(client, file_id, media_session):
+    for _ in range(6):
+        exported = await client.invoke(
+            raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id)
+        )
+        try:
+            await media_session.send(raw.functions.auth.ImportAuthorization(
+                id=exported.id,
+                bytes=exported.bytes,
+            ))
+            return
+        except AuthBytesInvalid:
+            logging.debug("Invalid authorization bytes for DC %s", file_id.dc_id)
+    await media_session.stop()
+    raise AuthBytesInvalid
+
+
+async def _create_media_session(client, file_id):
+    is_foreign_dc = file_id.dc_id != await client.storage.dc_id()
+    auth_key = (
+        await Auth(
+            client,
+            file_id.dc_id,
+            await client.storage.test_mode(),
+        ).create()
+        if is_foreign_dc
+        else await client.storage.auth_key()
+    )
+    media_session = Session(
+        client,
+        file_id.dc_id,
+        auth_key,
+        await client.storage.test_mode(),
+        is_media=True,
+    )
+    await media_session.start()
+    if is_foreign_dc:
+        await _authorize_media_session(client, file_id, media_session)
+    return media_session
+
+
+def _normalize_chunk_request(request, legacy_args):
+    if isinstance(request, FileChunkRequest):
+        return request
+    return FileChunkRequest(request, *legacy_args)
 
 
 class ByteStreamer:
@@ -58,59 +118,14 @@ class ByteStreamer:
         return self.cached_file_ids[id]
 
     async def generate_media_session(self, client: Client, file_id: FileId) -> Session:
-        """
-        Generates the media session for the DC that contains the media file.
-        This is required for getting the bytes from Telegram servers.
-        """
-
+        """Return or create the media session for the file's data center."""
         media_session = client.media_sessions.get(file_id.dc_id, None)
-
         if media_session is None:
-            if file_id.dc_id != await client.storage.dc_id():
-                media_session = Session(
-                    client,
-                    file_id.dc_id,
-                    await Auth(
-                        client, file_id.dc_id, await client.storage.test_mode()
-                    ).create(),
-                    await client.storage.test_mode(),
-                    is_media=True,
-                )
-                await media_session.start()
-
-                for _ in range(6):
-                    exported_auth = await client.invoke(
-                        raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id)
-                    )
-
-                    try:
-                        await media_session.send(
-                            raw.functions.auth.ImportAuthorization(
-                                id=exported_auth.id, bytes=exported_auth.bytes
-                            )
-                        )
-                        break
-                    except AuthBytesInvalid:
-                        logging.debug(
-                            f"Invalid authorization bytes for DC {file_id.dc_id}"
-                        )
-                        continue
-                else:
-                    await media_session.stop()
-                    raise AuthBytesInvalid
-            else:
-                media_session = Session(
-                    client,
-                    file_id.dc_id,
-                    await client.storage.auth_key(),
-                    await client.storage.test_mode(),
-                    is_media=True,
-                )
-                await media_session.start()
-            logging.debug(f"Created media session for DC {file_id.dc_id}")
+            media_session = await _create_media_session(client, file_id)
+            logging.debug("Created media session for DC %s", file_id.dc_id)
             client.media_sessions[file_id.dc_id] = media_session
         else:
-            logging.debug(f"Using cached media session for DC {file_id.dc_id}")
+            logging.debug("Using cached media session for DC %s", file_id.dc_id)
         return media_session
 
 
@@ -159,65 +174,47 @@ class ByteStreamer:
             )
         return location
 
-    async def yield_file(
-        self,
-        file_id: FileId,
-        index: int,
-        offset: int,
-        first_part_cut: int,
-        last_part_cut: int,
-        part_count: int,
-        chunk_size: int,
-    ) -> Union[str, None]:
-        """
-        Custom generator that yields the bytes of the media file.
-        Modded from <https://github.com/eyaadh/megadlbot_oss/blob/master/mega/telegram/utils/custom_download.py#L20>
-        Thanks to Eyaadh <https://github.com/eyaadh>
-        """
-        client = self.client
-        work_loads[index] += 1
-        logging.debug(f"Starting to yielding file with client {index}.")
-        media_session = await self.generate_media_session(client, file_id)
-
+    async def _stream_chunks(self, media_session, request):
+        location = await self.get_location(request.file_id)
         current_part = 1
-        location = await self.get_location(file_id)
+        offset = request.offset
+        while current_part <= request.part_count:
+            result = await media_session.send(raw.functions.upload.GetFile(
+                location=location,
+                offset=offset,
+                limit=request.chunk_size,
+            ))
+            if not isinstance(result, raw.types.upload.File) or not result.bytes:
+                return
+            if request.part_count == 1:
+                yield result.bytes[request.first_part_cut:request.last_part_cut]
+            elif current_part == 1:
+                yield result.bytes[request.first_part_cut:]
+            elif current_part == request.part_count:
+                yield result.bytes[:request.last_part_cut]
+            else:
+                yield result.bytes
+            current_part += 1
+            offset += request.chunk_size
 
+    async def yield_file(self, request, *legacy_args) -> Union[str, None]:
+        """Yield requested byte chunks, accepting the original positional API."""
+        request = _normalize_chunk_request(request, legacy_args)
+        client = self.client
+        work_loads[request.client_index] += 1
+        logging.debug("Starting file stream with client %s", request.client_index)
         try:
-            r = await media_session.send(
-                raw.functions.upload.GetFile(
-                    location=location, offset=offset, limit=chunk_size
-                ),
-            )
-            if isinstance(r, raw.types.upload.File):
-                while True:
-                    chunk = r.bytes
-                    if not chunk:
-                        break
-                    elif part_count == 1:
-                        yield chunk[first_part_cut:last_part_cut]
-                    elif current_part == 1:
-                        yield chunk[first_part_cut:]
-                    elif current_part == part_count:
-                        yield chunk[:last_part_cut]
-                    else:
-                        yield chunk
-
-                    current_part += 1
-                    offset += chunk_size
-
-                    if current_part > part_count:
-                        break
-
-                    r = await media_session.send(
-                        raw.functions.upload.GetFile(
-                            location=location, offset=offset, limit=chunk_size
-                        ),
-                    )
+            session = await self.generate_media_session(client, request.file_id)
+            async for chunk in self._stream_chunks(session, request):
+                yield chunk
         except (TimeoutError, AttributeError):
-            logging.getLogger(__name__).debug("Custom download worker did not return a usable result", exc_info=True)
+            logging.getLogger(__name__).debug(
+                "Custom download worker did not return a usable result",
+                exc_info=True,
+            )
         finally:
-            logging.debug("Finished yielding file with {current_part} parts.")
-            work_loads[index] -= 1
+            logging.debug("Finished file stream for client %s", request.client_index)
+            work_loads[request.client_index] -= 1
 
     
     async def clean_cache(self) -> None:
