@@ -1,26 +1,27 @@
 
 
-import re, base64
+import base64
+import logging
+import re
 from struct import pack
-from datetime import datetime
+from dataclasses import dataclass
 from pyrogram.file_id import FileId
-from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError, PyMongoError
-from info import FILE_DB_URI, SEC_FILE_DB_URI, DATABASE_NAME, COLLECTION_NAME, MULTIPLE_DATABASE, USE_CAPTION_FILTER, ALLOWED_EXTENSIONS, FILTER_BY_EXTENSION
+from database.file_collections import col, sec_col
+from database import indexing_checkpoints as checkpoint_store
+from info import (
+    ALLOWED_EXTENSIONS,
+    FILTER_BY_EXTENSION,
+    MULTIPLE_DATABASE,
+    USE_CAPTION_FILTER,
+)
 
-# First Database For File Saving 
-client = MongoClient(FILE_DB_URI)
-db = client[DATABASE_NAME]
-col = db[COLLECTION_NAME]
+logger = logging.getLogger(__name__)
 
-# Second Database For File Saving
-sec_client = MongoClient(SEC_FILE_DB_URI)
-sec_db = sec_client[DATABASE_NAME]
-sec_col = sec_db[COLLECTION_NAME]
-
-# Checkpoint collection for indexing resume
-checkpoint_col = db['indexing_checkpoints']
-
+save_checkpoint = checkpoint_store.save_checkpoint
+get_checkpoint = checkpoint_store.get_checkpoint
+delete_checkpoint = checkpoint_store.delete_checkpoint
+get_all_checkpoints = checkpoint_store.get_all_checkpoints
 
 async def save_file(media):
     """Save file in the database."""
@@ -35,27 +36,27 @@ async def save_file(media):
         'caption': media.caption.html if media.caption else None
     }
 
-    if is_file_already_saved(file_id, file_name):
+    if await is_file_already_saved(file_id, file_name):
         return False, 0
 
     try:
-        col.insert_one(file)
-        print(f"{file_name} is successfully saved.")
+        await col.insert_one(file)
+        logger.info("%s is successfully saved", file_name)
         return True, 1
     except DuplicateKeyError:
-        print(f"{file_name} is already saved.")
+        logger.info("%s is already saved", file_name)
         return False, 0
     except PyMongoError:
         if MULTIPLE_DATABASE:
             try:
-                sec_col.insert_one(file)
-                print(f"{file_name} is successfully saved.")
+                await sec_col.insert_one(file)
+                logger.info("%s is successfully saved", file_name)
                 return True, 1
             except DuplicateKeyError:
-                print(f"{file_name} is already saved.")
+                logger.info("%s is already saved", file_name)
                 return False, 0
         else:
-            print("Your Current File Database Is Full, Turn On Multiple Database Feature And Add Second File Mongodb To Save File.")
+            logger.error("The file database is full and no secondary database is configured")
             return False, 2
 
 def clean_file_name(file_name):
@@ -68,88 +69,155 @@ def clean_file_name(file_name):
         
     return ' '.join(filter(lambda x: not x.startswith('@') and not x.startswith('http') and not x.startswith('www.') and not x.startswith('t.me'), file_name.split()))
 
-def is_file_already_saved(file_id, file_name):
+
+async def _delete_from_file_collections(method_name, query):
+    for collection in (col, sec_col):
+        result = await getattr(collection, method_name)(query)
+        if result.deleted_count:
+            return result.deleted_count
+    return 0
+
+
+async def delete_file_by_id(file_id):
+    """Delete one indexed file by ID from the active file collections."""
+    return await _delete_from_file_collections(
+        "delete_one",
+        {"file_id": file_id},
+    )
+
+
+async def delete_file_record(file_id, file_name, file_size):
+    """Delete an indexed media record using its ID and filename fallbacks."""
+    deleted_count = await delete_file_by_id(file_id)
+    if deleted_count:
+        return deleted_count
+
+    cleaned_name = clean_file_name(file_name)
+    deleted_count = await _delete_from_file_collections(
+        "delete_many",
+        {"file_name": cleaned_name, "file_size": file_size},
+    )
+    if deleted_count or cleaned_name == file_name:
+        return deleted_count
+
+    return await _delete_from_file_collections(
+        "delete_many",
+        {"file_name": file_name, "file_size": file_size},
+    )
+
+
+async def is_file_already_saved(file_id, file_name):
     """Check if the file is already saved in either collection."""
     found1 = {'file_name': file_name}
     found = {'file_id': file_id}
 
     for collection in [col, sec_col]:
-        if collection.find_one(found1) or collection.find_one(found):
-            print(f"{file_name} is already saved.")
+        if await collection.find_one(found1) or await collection.find_one(found):
+            logger.info("%s is already saved", file_name)
             return True
             
     return False
 
-async def get_search_results(chat_id, query, file_type=None, max_results=10, offset=0, filter=False, format_type=None):
-    """For given query return (results, next_offset)
-    
-    Args:
-        format_type: 'ebook' | 'audiobook' | None (all formats)
-    """
-    
-    # File extension patterns for format filtering
-    # Note: file names are cleaned - dots replaced with spaces, so "file.mp3" becomes "file mp3"
-    EBOOK_EXTENSIONS = r'\s(pdf|epub|mobi|azw|azw3|djvu|txt|cbr|cbz)(\s|$)'
-    AUDIO_EXTENSIONS = r'\s(mp3|m4a|m4b|aac|ogg|flac|wav|wma|zip)(\s|$)'
-    
-    query = query.strip()
-    if not query:
-        raw_pattern = '.'
-    elif ' ' not in query:
-        raw_pattern = r'(\b|[\.\+\-_])' + query + r'(\b|[\.\+\-_])'
+@dataclass(frozen=True)
+class SearchRequest:
+    query: str
+    max_results: int = 10
+    offset: int = 0
+    format_type: str | None = None
+
+
+def _compile_search_regex(query):
+    normalized_query = query.strip()
+    if not normalized_query:
+        raw_pattern = "."
+    elif " " not in normalized_query:
+        raw_pattern = (
+            r"(\b|[\.\+\-_])"
+            + normalized_query
+            + r"(\b|[\.\+\-_])"
+        )
     else:
-        raw_pattern = query.replace(' ', r'.*[\s\.\+\-_]') 
+        raw_pattern = normalized_query.replace(
+            " ",
+            r".*[\s\.\+\-_]",
+        )
     try:
-        regex = re.compile(raw_pattern, flags=re.IGNORECASE)
+        return re.compile(raw_pattern, flags=re.IGNORECASE)
     except re.error:
-        regex = query
-    
-    # Build filter with optional format type
-    if format_type == 'ebook':
-        format_regex = re.compile(EBOOK_EXTENSIONS, flags=re.IGNORECASE)
-        filter = {'file_name': regex, '$or': [
-            {'file_name': format_regex},
-            {'file_name': {'$not': re.compile(AUDIO_EXTENSIONS, flags=re.IGNORECASE)}}
-        ]}
-        # Simpler approach: exclude audio files for ebooks
-        filter = {'$and': [
-            {'file_name': regex},
-            {'file_name': {'$not': re.compile(AUDIO_EXTENSIONS, flags=re.IGNORECASE)}}
-        ]}
-    elif format_type == 'audiobook':
-        format_regex = re.compile(AUDIO_EXTENSIONS, flags=re.IGNORECASE)
-        filter = {'$and': [
-            {'file_name': regex},
-            {'file_name': format_regex}
-        ]}
-    else:
-        filter = {'file_name': regex}
+        return normalized_query
+
+
+def _build_search_filter(query, format_type):
+    name_regex = _compile_search_regex(query)
+    audio_pattern = (
+        r"\s(mp3|m4a|m4b|aac|ogg|flac|wav|wma|zip)(\s|$)"
+    )
+    audio_regex = re.compile(audio_pattern, flags=re.IGNORECASE)
+    if format_type == "ebook":
+        return {
+            "$and": [
+                {"file_name": name_regex},
+                {"file_name": {"$not": audio_regex}},
+            ]
+        }
+    if format_type == "audiobook":
+        return {
+            "$and": [
+                {"file_name": name_regex},
+                {"file_name": audio_regex},
+            ]
+        }
+    return {"file_name": name_regex}
+
+
+async def _find_search_files(search_filter, request):
+    if not MULTIPLE_DATABASE:
+        cursor = (
+            col.find(search_filter)
+            .sort("$natural", -1)
+            .skip(request.offset)
+            .limit(request.max_results)
+        )
+        return await cursor.to_list(length=request.max_results)
+
+    primary_count = await col.count_documents(search_filter)
     files = []
+    if request.offset < primary_count:
+        primary_cursor = (
+            col.find(search_filter)
+            .sort("$natural", -1)
+            .skip(request.offset)
+            .limit(request.max_results)
+        )
+        files.extend(
+            await primary_cursor.to_list(length=request.max_results)
+        )
+
+    if len(files) < request.max_results:
+        remaining = request.max_results - len(files)
+        secondary_offset = max(0, request.offset - primary_count)
+        secondary_cursor = (
+            sec_col.find(search_filter)
+            .sort("$natural", -1)
+            .skip(secondary_offset)
+            .limit(remaining)
+        )
+        files.extend(await secondary_cursor.to_list(length=remaining))
+    return files
+
+
+async def get_search_results(request):
+    """Return matching files, the next offset, and total result count."""
+    search_filter = _build_search_filter(
+        request.query,
+        request.format_type,
+    )
+    files = await _find_search_files(search_filter, request)
+    total_results = await col.count_documents(search_filter)
     if MULTIPLE_DATABASE:
-        count1 = col.count_documents(filter)
-        if offset < count1:
-            cursor1 = col.find(filter).sort('$natural', -1).skip(offset).limit(max_results)
-            for file in cursor1:
-                files.append(file)
-        
-        if len(files) < max_results:
-            remaining_limit = max_results - len(files)
-            if offset >= count1:
-                sec_offset = offset - count1
-            else:
-                sec_offset = 0
-            cursor2 = sec_col.find(filter).sort('$natural', -1).skip(sec_offset).limit(remaining_limit)
-            for file in cursor2:
-                files.append(file)
-    else:
-        cursor = col.find(filter).sort('$natural', -1).skip(offset).limit(max_results)
-        
-        for file in cursor:
-            files.append(file)
-
-    total_results = col.count_documents(filter) if not MULTIPLE_DATABASE else (col.count_documents(filter) + sec_col.count_documents(filter))
-    next_offset = "" if (offset + max_results) >= total_results else (offset + max_results)
-
+        total_results += await sec_col.count_documents(search_filter)
+    consumed = request.offset + request.max_results
+    next_offset = "" if consumed >= total_results else consumed
     return files, next_offset, total_results
 
 async def get_bad_files(query, file_type=None, use_filter=False):
@@ -172,20 +240,17 @@ async def get_bad_files(query, file_type=None, use_filter=False):
     if USE_CAPTION_FILTER:
         filter_criteria = {'$or': [filter_criteria, {'caption': regex}]}
 
-    def count_documents(collection):
-        return collection.count_documents(filter_criteria)
-
-    total_results = (count_documents(col) + count_documents(sec_col) if MULTIPLE_DATABASE else count_documents(col))
-
-    def find_documents(collection):
-        return list(collection.find(filter_criteria))
-
-    files = (find_documents(col) + find_documents(sec_col) if MULTIPLE_DATABASE else find_documents(col))
+    total_results = await col.count_documents(filter_criteria)
+    files = await col.find(filter_criteria).to_list(length=None)
+    if MULTIPLE_DATABASE:
+        total_results += await sec_col.count_documents(filter_criteria)
+        files.extend(await sec_col.find(filter_criteria).to_list(length=None))
 
     return files, total_results
 
 async def get_file_details(query):
-    return col.find_one({'file_id': query}) or sec_col.find_one({'file_id': query})
+    file = await col.find_one({'file_id': query})
+    return file or await sec_col.find_one({'file_id': query})
 
 def encode_file_id(s: bytes) -> str:
     r = b""
@@ -215,10 +280,6 @@ def unpack_new_file_id(new_file_id):
     return file_id
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 📥 INDEXING CHECKPOINT FUNCTIONS
-# ═══════════════════════════════════════════════════════════════════════════════
-
 def is_allowed_file(file_name):
     """Check if file extension is in allowed list (ebooks/audiobooks)."""
     if not FILTER_BY_EXTENSION:
@@ -227,34 +288,3 @@ def is_allowed_file(file_name):
         return False
     ext = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
     return ext in ALLOWED_EXTENSIONS
-
-
-def save_checkpoint(chat_id, current_msg, stats):
-    """Save indexing progress to database for resume capability."""
-    checkpoint_col.update_one(
-        {'chat_id': chat_id},
-        {'$set': {
-            'current_msg': current_msg,
-            'stats': stats,
-            'updated_at': datetime.utcnow()
-        }},
-        upsert=True
-    )
-
-
-def get_checkpoint(chat_id):
-    """Get saved checkpoint for a channel."""
-    return checkpoint_col.find_one({'chat_id': chat_id})
-
-
-def delete_checkpoint(chat_id):
-    """Remove checkpoint after successful completion."""
-    checkpoint_col.delete_one({'chat_id': chat_id})
-
-
-def get_all_checkpoints():
-    """Get all active checkpoints for /resume command."""
-    return list(checkpoint_col.find())
-
-
-#EbookGuy
