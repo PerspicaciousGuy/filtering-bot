@@ -107,15 +107,17 @@ class PremiumUsageMixin:
             )
             return new_count
 
-    async def get_remaining_conversions(self, user_id):
-        """Get remaining conversions for today (limit: 3/day for premium)"""
+    async def get_remaining_conversions(self, user_id, daily_limit):
+        """Get remaining conversions for the configured daily limit."""
+        if daily_limit == 0:
+            return -1
         user = await self.col.find_one({'id': int(user_id)})
         if not user:
-            return 3
+            return daily_limit
         today = str(datetime.date.today())
         if user.get('last_conversion_date') != today:
-            return 3
-        return max(0, 3 - user.get('daily_conversions', 0))
+            return daily_limit
+        return max(0, daily_limit - user.get('daily_conversions', 0))
 
     async def increment_conversions(self, user_id):
         """Increment daily conversion count for user"""
