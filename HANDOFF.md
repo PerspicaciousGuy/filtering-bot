@@ -4,7 +4,7 @@
 EbookGuy is a Python Telegram bot for searching, downloading, indexing, and converting ebooks/audiobooks with premium access via Telegram Stars and external payment links. It uses Pyrogram/pyrofork, MongoDB/Motor, plugin-based handlers, and an aiohttp keepalive server.
 
 ## Current State
-The split phase is complete and the first organization pass is complete. Thin Pyrogram plugin/decorator entrypoints remain in `plugins/`, because `bot.py` loads `plugins/*.py`. Extracted implementation code now lives in domain folders under `EbookGuy/features/`, shared utility code lives under `EbookGuy/shared/`, and the public compatibility barrels (`utils.py`, `plugins/pm_filter_search.py`, `plugins/pm_filter_filtering.py`, `plugins/commands_downloads.py`) preserve existing import surfaces.
+The planned split, modernization, duplication cleanup, dead-code audit, organization, watermark audit, and validation phases are complete. Thin Pyrogram plugin/decorator entrypoints remain in `plugins/`, because `bot.py` loads `plugins/*.py`. Extracted implementation code now lives in domain folders under `EbookGuy/features/`, shared utility code lives under `EbookGuy/shared/`, and public compatibility barrels preserve existing import surfaces.
 
 Current domain layout:
 - `EbookGuy/features/search/` - search state, format selection, and result rendering.
@@ -19,31 +19,26 @@ Current domain layout:
 The local repository is on branch `main`, tracks `origin/main`, and local-only `AGENTS.md` / `agents-guidelines/` should remain ignored and untracked.
 
 ## Last Action
-Fixed empty-result handling in manual and global filter database lookups:
-- Replaced cursor loops with single `find_one()` lookups.
-- Both functions now explicitly return `(None, None, None, None)` when no record matches.
-- Optional alert data now uses `dict.get()` while required stored fields retain explicit key access and existing error logging.
+Completed the modernization and organization phases. Extracted inline search, user-info, delete-channel, duplicate-maintenance, start, indexing, search presentation, database connection, filter-stat, and checkpoint responsibilities into focused modules. Plugins now contain handler registration or explicit compatibility exports. Consolidated duplicate implementations, removed wildcard and unused imports, restored corrupted search regexes and user-facing replacement characters, and preserved legacy positional APIs through request-object adapters.
 
-Verification: isolated smoke checks passed for empty results, complete records, records without alerts, and `PyMongoError`; `python -m compileall -q .` and `git diff --check` passed.
+Verification: all 98 Python files compile under Python 3.13; no file is 300 lines or larger; no function exceeds 50 lines or three parameters; no wildcard or unused imports, duplicate function bodies, broad exceptions, production prints, control characters, or suspect source encodings remain. Targeted smoke tests cover search/pagination, start routing, indexing state, iterator batching, compatibility adapters, search regexes, checkpoint exports, and callback payloads.
+
 ## In Progress
-No active file edit is in progress.
+None.
 
 ## Pending
-- Convert synchronous PyMongo operations inside async functions one module at a time, starting with `database/connections_mdb.py`.
-- Review synchronous PyMongo calls inside async functions and move blocking work off the event loop where needed.
-- Consider later internal function-level cleanup for modules that are under 300 lines but still have large functions, such as `EbookGuy/features/search/results.py`, `EbookGuy/features/downloads/start.py`, and `EbookGuy/features/indexing/worker.py`.
-
+- Commit the completed refactor when the user is ready.
+- Run a live Telegram smoke test in the deployed environment before release.
 ## Known Issues
-- No test suite or CI workflow was found, so refactors are currently verified only by compile/static checks.
-- Broader watermark-like identifiers remain and were not renamed in this local-variable pass: `EbookGuy` package paths, `EbookGuyXBot`, `EbookGuyBot`, `MELCOW_NEW_USERS`, `MELCOW`, and `MELCOW_ENG`.
-- `EbookGuy/features/indexing/worker.py` preserves the original large `index_files_to_db` function and recursive resume behavior during FloodWait handling.
-- Some async database functions still call synchronous PyMongo operations directly.
+- No repository test suite or CI workflow was found; verification uses compile/static gates and isolated behavior smoke tests.
+- Retained dormant, unreferenced compatibility code: `database/connections_mdb.py:add_connection`, `EbookGuy/util/custom_dl.py:ByteStreamer`, and `EbookGuy/util/render_template.py:render_page`.
+- Watermark/attribution identifiers retained for compatibility or branding: `EbookGuy`, `EbookGuyXBot`, `EbookGuyBot`, `MELCOW_NEW_USERS`, and `MELCOW`. The dormant `req.html` template also contains `Tech_VJ`, `VJ_Bots`, and `KingVJ01`; `custom_dl.py` credits `Eyaadh` in documentation. No generated filename watermark remains.
 - Compile verification generated ignored `__pycache__/` files.
 
 ## Files Status
-- Created: `EbookGuy/features/filters/delivery.py`, `EbookGuy/features/__init__.py`, `EbookGuy/features/search/`, `EbookGuy/features/filters/`, `EbookGuy/features/downloads/`, `EbookGuy/features/premium/`, `EbookGuy/features/indexing/`, `EbookGuy/features/admin/`, `EbookGuy/features/requests/`, `EbookGuy/shared/`, and package `__init__.py` files inside each new folder.
+- Created: focused search, download, indexing, admin, shared, and database modules, including `inline_queries.py`, `models.py`, `pagination.py`, `rendering.py`, `start_views.py`, `start_delivery.py`, `force_subscription.py`, `progress.py`, `user_info.py`, `file_cleanup.py`, `file_collections.py`, `filter_stats.py`, and `indexing_checkpoints.py`.
 - Moved: plugin implementation modules from `plugins/` into their matching `EbookGuy/features/*` folders; root `utils_*` modules into `EbookGuy/shared/`.
 - Modified: `plugins/commands.py`, `plugins/commands_downloads.py`, `plugins/index.py`, `plugins/pm_filter_callbacks.py`, `plugins/pm_filter_filtering.py`, `plugins/pm_filter_search.py`, `plugins/premium.py`, `plugins/banned.py`, `utils.py`, moved implementation modules with updated import paths, `EbookGuy/features/search/results.py`, `EbookGuy/features/downloads/start.py`, `EbookGuy/features/filters/manual.py`, `EbookGuy/features/filters/global_filters.py`, `EbookGuy/features/filters/premium_callbacks.py`, `EbookGuy/features/indexing/moderation.py`, `EbookGuy/features/indexing/requests.py`, `EbookGuy/shared/filter_parser.py`, `info.py`, and `HANDOFF.md`.
 - Currently Being Edited: none.
-- Planned to Edit: `database/connections_mdb.py` synchronous PyMongo operations.
-- Untouched in this exception pass: `database/users_chats_db.py`, `requirements.txt`, `Dockerfile`, and `README.md`.
+- Planned to Edit: none.
+- Untouched dependencies/deployment: `requirements.txt` and `Dockerfile`.

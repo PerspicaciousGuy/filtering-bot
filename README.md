@@ -52,6 +52,14 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 | `info.py` | API keys, DB URLs, channel IDs, pricing |
 | `Script.py` | All user-facing text — edit for tone/language |
 
+### Code Organization
+
+- `plugins/` contains Pyrogram handler registration and compatibility exports.
+- `EbookGuy/features/` contains domain behavior for search, filters, downloads, premium, indexing, requests, and administration.
+- `EbookGuy/shared/` contains reusable state, formatting, settings, subscriptions, parsing, broadcast, and delivery helpers.
+- `database/` contains focused collection setup, query modules, and indexing checkpoint persistence.
+- `EbookGuy/util/` contains infrastructure utilities; the custom streaming/template subsystem is retained but currently has no active route.
+
 ### Premium Pricing
 ```python
 FREE_DAILY_LIMIT = 1          # Free downloads per day
