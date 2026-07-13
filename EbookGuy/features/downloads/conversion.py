@@ -10,6 +10,7 @@ from pymongo.errors import PyMongoError
 from Script import script
 from database.ia_filterdb import get_file_details
 from database.users_chats_db import db
+from EbookGuy.shared.global_settings import get_global_settings
 from utils import get_size
 
 
@@ -75,10 +76,15 @@ async def _deliver_conversion(client, query, conversion):
         protect_content=conversion.protect_content,
     )
     await db.increment_conversions(conversion.user_id)
-    remaining = await db.get_remaining_conversions(conversion.user_id)
+    settings = await get_global_settings()
+    daily_limit = int(settings["premium_daily_conversion_limit"])
+    remaining = await db.get_remaining_conversions(
+        conversion.user_id,
+        daily_limit,
+    )
     count_message = await sent_message.reply(
         "\u2705 <b>Conversion complete!</b>\n"
-        f"<i>({remaining} conversion(s) remaining today)</i>\n\n"
+        f"<i>({_remaining_conversion_text(remaining)})</i>\n\n"
         + script.IMPORTANT_DELETE_MSG
     )
     await asyncio.sleep(600)
@@ -127,6 +133,12 @@ def _conversion_menu_markup(prefix, file_id, source_format):
     return InlineKeyboardMarkup(buttons)
 
 
+def _remaining_conversion_text(remaining):
+    if remaining < 0:
+        return "Unlimited conversions"
+    return f"{remaining} conversion(s) remaining today"
+
+
 async def _load_conversion(query):
     _, prefix, file_id, target_format = query.data.split("#", 3)
     file = await get_file_details(file_id)
@@ -166,10 +178,16 @@ async def handle_convert_menu_callback(client, query):
             reply_markup=_premium_conversion_markup(prefix, file_id),
         )
         return
-    remaining = await db.get_remaining_conversions(query.from_user.id)
-    if remaining <= 0:
+    settings = await get_global_settings()
+    daily_limit = int(settings["premium_daily_conversion_limit"])
+    remaining = await db.get_remaining_conversions(
+        query.from_user.id,
+        daily_limit,
+    )
+    if remaining == 0:
         await query.answer(
-            "Daily conversion limit reached (3/day). Try again tomorrow!",
+            f"Daily conversion limit reached ({daily_limit}/day). "
+            "Try again tomorrow!",
             show_alert=True,
         )
         return
@@ -192,7 +210,7 @@ async def handle_convert_menu_callback(client, query):
         f"\U0001f4d6 <b>{_clean_title(file['file_name'])}</b>\n"
         f"Source format: <code>{source_format.upper()}</code>\n\n"
         "Choose target format:\n"
-        f"<i>({remaining} conversion(s) remaining today)</i>",
+        f"<i>({_remaining_conversion_text(remaining)})</i>",
         reply_markup=_conversion_menu_markup(
             prefix,
             file_id,
