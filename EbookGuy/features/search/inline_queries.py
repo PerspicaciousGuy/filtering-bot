@@ -11,16 +11,14 @@ from pyrogram.types import (
     InlineQueryResultCachedDocument,
 )
 
-from database.ia_filterdb import SearchRequest, get_search_results
+from database.search_repository import SearchRequest, get_search_results
 from EbookGuy.shared.formatting import format_file_caption
-from info import AUTH_CHANNEL, AUTH_USERS, CACHE_TIME
+from EbookGuy.shared.global_settings import get_global_settings
+from info import AUTH_CHANNEL, AUTH_USERS
 from utils import get_size, is_subscribed, temp
 
 
 logger = logging.getLogger(__name__)
-CACHE_DURATION = 0 if AUTH_USERS or AUTH_CHANNEL else CACHE_TIME
-
-
 @dataclass(frozen=True)
 class InlineResultPage:
     results: list
@@ -73,7 +71,7 @@ def _build_inline_results(files, reply_markup):
     return results
 
 
-async def _answer_found(query, page):
+async def _answer_found(query, page, cache_duration):
     switch_text = f"{emoji.FILE_FOLDER} Results - {page.total_results}"
     if page.query_text:
         switch_text += f" for {page.query_text}"
@@ -81,7 +79,7 @@ async def _answer_found(query, page):
         await query.answer(
             results=page.results,
             is_personal=True,
-            cache_time=CACHE_DURATION,
+            cache_time=cache_duration,
             switch_pm_text=switch_text,
             switch_pm_parameter="start",
             next_offset=str(page.next_offset),
@@ -92,16 +90,39 @@ async def _answer_found(query, page):
         logger.exception("Failed to answer inline query")
 
 
-async def _answer_empty(query, query_text):
+async def _answer_empty(query, query_text, cache_duration):
     switch_text = f"{emoji.CROSS_MARK} No results"
     if query_text:
         switch_text += f' for "{query_text}"'
     await query.answer(
         results=[],
         is_personal=True,
-        cache_time=CACHE_DURATION,
+        cache_time=cache_duration,
         switch_pm_text=switch_text,
         switch_pm_parameter="okay",
+    )
+
+
+def _inline_cache_duration(settings):
+    if AUTH_USERS or AUTH_CHANNEL:
+        return 0
+    return int(settings["search_result_expiry_seconds"])
+
+
+async def _load_inline_page(query, settings):
+    query_text = query.query.split("|", maxsplit=1)[0].strip()
+    files, next_offset, total = await get_search_results(SearchRequest(
+        query_text,
+        max_results=int(settings["results_per_page"]),
+        offset=_parse_offset(query.offset),
+        result_limit=int(settings["max_search_results"]),
+        use_caption_filter=bool(settings["use_caption_filter"]),
+    ))
+    return InlineResultPage(
+        results=_build_inline_results(files, get_reply_markup(query_text)),
+        next_offset=next_offset,
+        total_results=total,
+        query_text=query_text,
     )
 
 
@@ -123,18 +144,18 @@ async def handle_inline_query(bot, query):
             switch_pm_parameter="subscribe",
         )
         return
-    query_text = query.query.split("|", maxsplit=1)[0].strip()
-    files, next_offset, total = await get_search_results(SearchRequest(
-        query_text,
-        offset=_parse_offset(query.offset),
-    ))
-    results = _build_inline_results(files, get_reply_markup(query_text))
-    if not results:
-        await _answer_empty(query, query_text)
+    settings = await get_global_settings()
+    cache_duration = _inline_cache_duration(settings)
+    if not settings["search_enabled"]:
+        await query.answer(
+            results=[],
+            cache_time=0,
+            switch_pm_text="Search is temporarily disabled",
+            switch_pm_parameter="start",
+        )
         return
-    await _answer_found(query, InlineResultPage(
-        results=results,
-        next_offset=next_offset,
-        total_results=total,
-        query_text=query_text,
-    ))
+    page = await _load_inline_page(query, settings)
+    if not page.results:
+        await _answer_empty(query, page.query_text, cache_duration)
+        return
+    await _answer_found(query, page, cache_duration)
