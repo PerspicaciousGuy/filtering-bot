@@ -26,8 +26,7 @@ from EbookGuy.features.premium.views import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-print("✅ Premium plugin loaded successfully!")
-logging.info("Premium plugin initialized")
+logger.info("Premium plugin initialized")
 
 
 @Client.on_message(filters.command("plan") & filters.private, group=-1)
