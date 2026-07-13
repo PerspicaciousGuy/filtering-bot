@@ -70,8 +70,12 @@ def last_online(from_user):
     return time
 
 
-def get_cap(files, search, pre='file'):
-    cap = f"<b>The Result for => {search}\n\n⚠️ After 5 minutes this message will be Automatically Deleted 🗑️\n\n</b>"
+def get_cap(files, search, options='file'):
+    if isinstance(options, tuple):
+        pre, expiry_seconds = options
+    else:
+        pre, expiry_seconds = options, 300
+    cap = f"<b>The Result for => {search}\n\n⚠️ After {expiry_seconds} seconds this message will be Automatically Deleted 🗑️\n\n</b>"
     cap += "<b><u>📚 Your Book Files 👇</u></b>\n\n"
     for file in files:
         cap += f"<b>📁 <a href='https://telegram.me/{temp.U_NAME}?start={pre}_{file['file_id']}'>[{get_size(file['file_size'])}] {' '.join(filter(lambda x: not x.startswith('[') and not x.startswith('@') and not x.startswith('www.'), file['file_name'].split()))}\n\n</a></b>"

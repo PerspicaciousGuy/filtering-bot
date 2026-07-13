@@ -1,10 +1,10 @@
 import re
 
-from database.ia_filterdb import SearchRequest, get_search_results
+from database.search_repository import SearchRequest, get_search_results
 from EbookGuy.features.search.models import AutoFilterRequest, SearchOutcome
 from EbookGuy.features.search.page_navigation import handle_next_page
 from EbookGuy.features.search.rendering import show_no_results, show_search_results
-from utils import get_settings
+from EbookGuy.shared.global_settings import get_global_settings
 
 
 IGNORED_SEARCH_WORDS = {
@@ -32,18 +32,28 @@ def _normalize_search(name):
     return search.replace("-", " ").replace(":", "").replace(".", "")
 
 
-async def _search_with_fallback(message, search, format_type):
-    files, offset, total = await get_search_results(
-        SearchRequest(search, format_type=format_type)
+def _search_request(search, format_type, settings):
+    return SearchRequest(
+        search,
+        max_results=int(settings["results_per_page"]),
+        format_type=format_type,
+        result_limit=int(settings["max_search_results"]),
+        use_caption_filter=bool(settings["use_caption_filter"]),
     )
-    if not files:
+
+
+async def _search_with_fallback(search, format_type, settings):
+    files, offset, total = await get_search_results(
+        _search_request(search, format_type, settings)
+    )
+    if not files and settings["search_suggestions_enabled"]:
         words = search.split()
         for drop_count in range(1, len(words) - 1):
             shorter = " ".join(words[:-drop_count])
             if len(shorter) < 3:
                 break
             files, offset, total = await get_search_results(
-                SearchRequest(shorter, format_type=format_type)
+                _search_request(shorter, format_type, settings)
             )
             if files:
                 search = shorter
@@ -53,7 +63,7 @@ async def _search_with_fallback(message, search, format_type):
         next_offset=offset,
         total_results=total,
         search=search,
-        settings=await get_settings(message.chat.id),
+        settings=settings,
     )
 
 
@@ -66,12 +76,20 @@ async def auto_filter(request):
         or len(text) >= 100
     ):
         return
+    settings = await get_global_settings()
+    if not settings["search_enabled"]:
+        await request.reply_message.edit_text(
+            "<b>Search is temporarily disabled.</b>"
+        )
+        return
     search = _normalize_search(request.name)
     outcome = await _search_with_fallback(
-        request.message, search, request.format_type
+        search,
+        request.format_type,
+        settings,
     )
     if not outcome.files:
-        await show_no_results(request)
+        await show_no_results(request, settings)
         return
     await show_search_results(request, outcome)
 
