@@ -7,7 +7,7 @@ from pyrogram import Client
 from pyrogram.types import InlineKeyboardMarkup, Message
 
 from database.connections_mdb import active_connection
-from EbookGuy.features.search.results import auto_filter
+from EbookGuy.features.search.results import AutoFilterRequest, auto_filter
 from EbookGuy.shared.filter_parser import parse_stored_buttons
 from utils import get_settings, save_group_settings
 
@@ -138,11 +138,11 @@ async def run_auto_search(workflow: FilterWorkflow) -> None:
         f"<b><i>Searching For {message.text} \U0001F50D</i></b>"
     )
     await auto_filter(
-        workflow.client,
-        message.text,
-        message,
-        reply_message,
-        True,
+        AutoFilterRequest(
+            name=message.text,
+            message=message,
+            reply_message=reply_message,
+        )
     )
 
 
