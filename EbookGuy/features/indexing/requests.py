@@ -1,5 +1,6 @@
 import logging
 import re
+from dataclasses import dataclass
 
 from pyrogram import enums
 from pyrogram.errors import RPCError
@@ -11,85 +12,200 @@ from pyrogram.errors.exceptions.bad_request_400 import (
 )
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from database.ia_filterdb import get_checkpoint
+from database.indexing_checkpoints import get_checkpoint
 from info import ADMINS, FILTER_BY_EXTENSION
 from info import INDEX_REQ_CHANNEL as LOG_CHANNEL
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+INDEX_LINK_PATTERN = re.compile(
+    r"(https://)?(t\.me/|telegram\.me/|telegram\.dog/)"
+    r"(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$"
+)
 
-async def handle_send_for_index(bot, message):
-    msg = await bot.ask(message.chat.id, "**📥 Send me your channel's last post link or forward the last message from your index channel.**\n\n💡 Tips:\n• Use /setskip <number> to skip messages\n• Use /resume to continue paused indexing\n• Indexing auto-saves progress every 100 messages")
-    if msg.forward_from_chat and msg.forward_from_chat.type == enums.ChatType.CHANNEL:
-        last_msg_id = msg.forward_from_message_id
-        chat_id = msg.forward_from_chat.username or msg.forward_from_chat.id
-    elif msg.text:
-        regex = re.compile("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")
-        match = regex.match(msg.text)
-        if not match:
-            return await msg.reply('Invalid link\n\nTry again by /index')
-        chat_id = match.group(4)
-        last_msg_id = int(match.group(5))
-        if chat_id.isnumeric():
-            chat_id  = int(("-100" + chat_id))
-    else:
-        return
+
+@dataclass(frozen=True)
+class IndexTarget:
+    chat_id: int | str
+    last_message_id: int
+
+
+async def _parse_index_target(response):
+    forwarded_chat = response.forward_from_chat
+    if (
+        forwarded_chat
+        and forwarded_chat.type == enums.ChatType.CHANNEL
+    ):
+        return IndexTarget(
+            chat_id=forwarded_chat.username or forwarded_chat.id,
+            last_message_id=response.forward_from_message_id,
+        )
+    if not response.text:
+        return None
+
+    match = INDEX_LINK_PATTERN.match(response.text)
+    if not match:
+        await response.reply("Invalid link\n\nTry again by /index")
+        return None
+    chat_id = match.group(4)
+    if chat_id.isnumeric():
+        chat_id = int("-100" + chat_id)
+    return IndexTarget(
+        chat_id=chat_id,
+        last_message_id=int(match.group(5)),
+    )
+
+
+async def _validate_index_target(bot, response, target):
     try:
-        await bot.get_chat(chat_id)
+        await bot.get_chat(target.chat_id)
     except ChannelInvalid:
-        return await msg.reply('This may be a private channel / group. Make me an admin over there to index the files.')
+        await response.reply(
+            "This may be a private channel / group. Make me an admin "
+            "over there to index the files."
+        )
+        return False
     except (UsernameInvalid, UsernameNotModified):
-        return await msg.reply('Invalid Link specified.')
+        await response.reply("Invalid Link specified.")
+        return False
     except RPCError:
         logger.exception("Failed to validate indexing target chat")
-        return await msg.reply('Unable to verify this chat right now. Please try again later.')
+        await response.reply(
+            "Unable to verify this chat right now. "
+            "Please try again later."
+        )
+        return False
+
     try:
-        k = await bot.get_messages(chat_id, last_msg_id)
+        last_message = await bot.get_messages(
+            target.chat_id,
+            target.last_message_id,
+        )
     except RPCError:
         logger.exception("Failed to fetch indexing target message")
-        return await message.reply('Make sure I am an admin in the channel, if the channel is private.')
-    if k.empty:
-        return await message.reply('This may be group and I am not an admin of the group.')
-
-    if message.from_user.id in ADMINS:
-        # Check for existing checkpoint
-        existing = get_checkpoint(chat_id if isinstance(chat_id, int) else chat_id)
-        resume_text = ""
-        if existing:
-            resume_text = f"\n\n⚠️ **Found saved progress at message {existing['current_msg']}**\nUse /resume to continue or start fresh."
-        
-        buttons = [[
-            InlineKeyboardButton('✅ Yes, Start Indexing', callback_data=f'index#accept#{chat_id}#{last_msg_id}#{message.from_user.id}')
-        ],[
-            InlineKeyboardButton('❌ Close', callback_data='close_data')
-        ]]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        filter_status = "✅ Enabled (ebooks/audiobooks only)" if FILTER_BY_EXTENSION else "❌ Disabled (all files)"
-        return await message.reply(
-            f'📥 **Index This Channel/Group?**\n\n'
-            f'📋 Chat ID: `{chat_id}`\n'
-            f'📨 Last Message: `{last_msg_id}`\n'
-            f'🔍 Extension Filter: {filter_status}'
-            f'{resume_text}',
-            reply_markup=reply_markup
+        await response.reply(
+            "Make sure I am an admin in the channel, "
+            "if the channel is private."
         )
+        return False
+    if last_message.empty:
+        await response.reply(
+            "This may be group and I am not an admin of the group."
+        )
+        return False
+    return True
 
-    if type(chat_id) is int:
+
+async def _show_admin_index_prompt(message, target):
+    checkpoint = await get_checkpoint(target.chat_id)
+    resume_text = ""
+    if checkpoint:
+        resume_text = (
+            "\n\n\u26a0\ufe0f **Found saved progress at message "
+            f"{checkpoint['current_msg']}**\n"
+            "Use /resume to continue or start fresh."
+        )
+    buttons = [
+        [
+            InlineKeyboardButton(
+                "\u2705 Yes, Start Indexing",
+                callback_data=(
+                    f"index#accept#{target.chat_id}#"
+                    f"{target.last_message_id}#{message.from_user.id}"
+                ),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "\u274c Close",
+                callback_data="close_data",
+            )
+        ],
+    ]
+    filter_status = (
+        "\u2705 Enabled (ebooks/audiobooks only)"
+        if FILTER_BY_EXTENSION
+        else "\u274c Disabled (all files)"
+    )
+    await message.reply(
+        "\U0001f4e5 **Index This Channel/Group?**\n\n"
+        f"\U0001f4cb Chat ID: \x60{target.chat_id}\x60\n"
+        f"\U0001f4e8 Last Message: \x60{target.last_message_id}\x60\n"
+        f"\U0001f50d Extension Filter: {filter_status}"
+        f"{resume_text}",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def _submit_index_request(bot, message, target):
+    if isinstance(target.chat_id, int):
         try:
-            link = (await bot.create_chat_invite_link(chat_id)).invite_link
+            invite = await bot.create_chat_invite_link(
+                target.chat_id
+            )
         except ChatAdminRequired:
-            return await message.reply('Make sure I am an admin in the chat and have permission to invite users.')
+            await message.reply(
+                "Make sure I am an admin in the chat and have "
+                "permission to invite users."
+            )
+            return
+        invite_link = invite.invite_link
     else:
-        link = f"@{chat_id}"
-    buttons = [[
-        InlineKeyboardButton('Accept Index', callback_data=f'index#accept#{chat_id}#{last_msg_id}#{message.from_user.id}')
-    ],[
-        InlineKeyboardButton('Reject Index', callback_data=f'index#reject#{chat_id}#{message.id}#{message.from_user.id}'),
-    ]]
-    reply_markup = InlineKeyboardMarkup(buttons)
+        invite_link = f"@{target.chat_id}"
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                "Accept Index",
+                callback_data=(
+                    f"index#accept#{target.chat_id}#"
+                    f"{target.last_message_id}#{message.from_user.id}"
+                ),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "Reject Index",
+                callback_data=(
+                    f"index#reject#{target.chat_id}#"
+                    f"{message.id}#{message.from_user.id}"
+                ),
+            )
+        ],
+    ]
     await bot.send_message(
         LOG_CHANNEL,
-        f'#IndexRequest\n\nBy : {message.from_user.mention} (`{message.from_user.id}`)\nChat ID/Username: `{chat_id}`\nLast Message ID: `{last_msg_id}`\nInviteLink: {link}',
-        reply_markup=reply_markup
+        "#IndexRequest\n\n"
+        f"By : {message.from_user.mention} "
+        f"(\x60{message.from_user.id}\x60)\n"
+        f"Chat ID/Username: \x60{target.chat_id}\x60\n"
+        f"Last Message ID: \x60{target.last_message_id}\x60\n"
+        f"InviteLink: {invite_link}",
+        reply_markup=InlineKeyboardMarkup(buttons),
     )
-    await message.reply('Thank you for the contribution! Wait for our moderators to verify the files.')
+    await message.reply(
+        "Thank you for the contribution! Wait for our moderators "
+        "to verify the files."
+    )
+
+
+async def handle_send_for_index(bot, message):
+    response = await bot.ask(
+        message.chat.id,
+        "**\U0001f4e5 Send me your channel's last post link or "
+        "forward the last message from your index channel.**\n\n"
+        "\U0001f4a1 Tips:\n"
+        "\u2022 Use /setskip <number> to skip messages\n"
+        "\u2022 Use /resume to continue paused indexing\n"
+        "\u2022 Indexing auto-saves progress every 100 messages",
+    )
+    target = await _parse_index_target(response)
+    if target is None:
+        return
+    if not await _validate_index_target(bot, response, target):
+        return
+    if message.from_user.id in ADMINS:
+        await _show_admin_index_prompt(message, target)
+        return
+    await _submit_index_request(bot, message, target)
