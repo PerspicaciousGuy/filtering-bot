@@ -1,135 +1,124 @@
+import logging
 
-
-import pymongo
+from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import PyMongoError
 
-from info import OTHER_DB_URI, DATABASE_NAME
+from info import DATABASE_NAME, OTHER_DB_URI
 
-import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
-myclient = pymongo.MongoClient(OTHER_DB_URI)
-mydb = myclient[DATABASE_NAME]
-mycol = mydb['CONNECTION'] 
+client = AsyncIOMotorClient(OTHER_DB_URI)
+database = client[DATABASE_NAME]
+collection = database["CONNECTION"]
+
 
 async def add_connection(group_id, user_id):
-    query = mycol.find_one(
-        { "_id": user_id },
-        { "_id": 0, "active_group": 0 }
+    query = await collection.find_one(
+        {"_id": user_id},
+        {"_id": 0, "active_group": 0},
     )
     if query is not None:
-        group_ids = [x["group_id"] for x in query["group_details"]]
+        group_ids = [item["group_id"] for item in query["group_details"]]
         if group_id in group_ids:
             return False
 
-    group_details = {
-        "group_id" : group_id
-    }
-
+    group_details = {"group_id": group_id}
     data = {
-        '_id': user_id,
-        'group_details' : [group_details],
-        'active_group' : group_id,
+        "_id": user_id,
+        "group_details": [group_details],
+        "active_group": group_id,
     }
 
-    if mycol.count_documents( {"_id": user_id} ) == 0:
+    if query is None:
         try:
-            mycol.insert_one(data)
+            await collection.insert_one(data)
             return True
         except PyMongoError:
-            logger.exception('Failed to add connection')
-
+            logger.exception("Failed to add connection")
     else:
         try:
-            mycol.update_one(
-                {'_id': user_id},
+            await collection.update_one(
+                {"_id": user_id},
                 {
                     "$push": {"group_details": group_details},
-                    "$set": {"active_group" : group_id}
-                }
+                    "$set": {"active_group": group_id},
+                },
             )
             return True
         except PyMongoError:
-            logger.exception('Failed to update connection')
+            logger.exception("Failed to update connection")
 
-        
+
 async def active_connection(user_id):
-
-    query = mycol.find_one(
-        { "_id": user_id },
-        { "_id": 0, "group_details": 0 }
+    query = await collection.find_one(
+        {"_id": user_id},
+        {"_id": 0, "group_details": 0},
     )
     if not query:
         return None
 
-    group_id = query['active_group']
-    return int(group_id) if group_id != None else None
+    group_id = query["active_group"]
+    return int(group_id) if group_id is not None else None
 
 
 async def all_connections(user_id):
-    query = mycol.find_one(
-        { "_id": user_id },
-        { "_id": 0, "active_group": 0 }
+    query = await collection.find_one(
+        {"_id": user_id},
+        {"_id": 0, "active_group": 0},
     )
-    if query is not None:
-        return [x["group_id"] for x in query["group_details"]]
-    else:
+    if query is None:
         return None
+    return [item["group_id"] for item in query["group_details"]]
 
 
 async def if_active(user_id, group_id):
-    query = mycol.find_one(
-        { "_id": user_id },
-        { "_id": 0, "group_details": 0 }
+    query = await collection.find_one(
+        {"_id": user_id},
+        {"_id": 0, "group_details": 0},
     )
-    return query is not None and query['active_group'] == group_id
+    return query is not None and query["active_group"] == group_id
 
 
 async def make_active(user_id, group_id):
-    update = mycol.update_one(
-        {'_id': user_id},
-        {"$set": {"active_group" : group_id}}
+    update = await collection.update_one(
+        {"_id": user_id},
+        {"$set": {"active_group": group_id}},
     )
     return update.modified_count != 0
 
 
 async def make_inactive(user_id):
-    update = mycol.update_one(
-        {'_id': user_id},
-        {"$set": {"active_group" : None}}
+    update = await collection.update_one(
+        {"_id": user_id},
+        {"$set": {"active_group": None}},
     )
     return update.modified_count != 0
 
 
 async def delete_connection(user_id, group_id):
-
     try:
-        update = mycol.update_one(
+        update = await collection.update_one(
             {"_id": user_id},
-            {"$pull" : { "group_details" : {"group_id":group_id} } }
+            {"$pull": {"group_details": {"group_id": group_id}}},
         )
         if update.modified_count == 0:
             return False
-        query = mycol.find_one(
-            { "_id": user_id },
-            { "_id": 0 }
-        )
-        if len(query["group_details"]) >= 1:
-            if query['active_group'] == group_id:
-                prvs_group_id = query["group_details"][len(query["group_details"]) - 1]["group_id"]
 
-                mycol.update_one(
-                    {'_id': user_id},
-                    {"$set": {"active_group" : prvs_group_id}}
+        query = await collection.find_one({"_id": user_id}, {"_id": 0})
+        if query["group_details"]:
+            if query["active_group"] == group_id:
+                previous_group_id = query["group_details"][-1]["group_id"]
+                await collection.update_one(
+                    {"_id": user_id},
+                    {"$set": {"active_group": previous_group_id}},
                 )
         else:
-            mycol.update_one(
-                {'_id': user_id},
-                {"$set": {"active_group" : None}}
+            await collection.update_one(
+                {"_id": user_id},
+                {"$set": {"active_group": None}},
             )
         return True
     except (KeyError, TypeError, PyMongoError):
-        logger.exception('Failed to delete connection')
+        logger.exception("Failed to delete connection")
         return False
-
