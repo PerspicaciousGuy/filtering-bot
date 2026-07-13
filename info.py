@@ -132,7 +132,7 @@ BTN_URL_3 = environ.get('BTN_URL_3', 'https://t.me/InsideAds_bot/open?startapp=r
 START_BUTTONS = [
     {"label": "🔥 Our Main Channel 🔥", "url": CHNL_LNK},
     {"label": "📚 How to Search Book Properly", "url": BTN_URL_2},
-    {"label": "� Grow Your Telegram Channel", "url": BTN_URL_3},
+    {"label": "\U0001f680 Grow Your Telegram Channel", "url": BTN_URL_3},
     # {"label": "💖 His Secret Obsession", "url": BTN_URL_4},  # Reserved
 ]
 
