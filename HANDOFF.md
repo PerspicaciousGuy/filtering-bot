@@ -19,18 +19,18 @@ Current domain layout:
 The local repository is on branch `main`, tracks `origin/main`, and local-only `AGENTS.md` / `agents-guidelines/` should remain ignored and untracked.
 
 ## Last Action
-Verified the updated BotFather token and started the bot locally with the isolated Python 3.10 environment. Telegram authentication completed, `EbookGuyBot.session` was updated, the background process remains active as PID `19120`, and `http://127.0.0.1:8080/` returns HTTP 200 with `Hello world`.
-
-The `.env` file was loaded only into the child process environment; no secret values were displayed or modified.
+Audited `/settings` command availability. No Pyrogram command handler, alias, dynamic bot-command registration, or runtime log entry exists for `/settings`, so the bot does not currently respond to it. Settings persistence and helper modules are used internally by filtering, delivery, search pagination, secure-file behavior, and auto-delete behavior, but there is no user-facing settings command.
 
 ## In Progress
-None.
+Callback latency measurement and safe early-acknowledgment optimization.
 
 ## Pending
 - Commit the completed refactor when the user is ready.
-- Exercise core Telegram commands against the locally running bot.
+- Move safe callback acknowledgments earlier based on measured handlers.
+- Exercise core Telegram commands against the optimized bot.
 - Run a live Telegram smoke test in the deployed environment before release.
 ## Known Issues
+- `/settings` has no registered command handler, so it currently produces no bot response.
 - No repository test suite or CI workflow was found; verification uses compile/static gates and isolated behavior smoke tests.
 - Docker is unavailable; local execution uses the isolated temporary Python 3.10 environment.
 - Retained dormant, unreferenced compatibility code: `database/connections_mdb.py:add_connection`, `EbookGuy/util/custom_dl.py:ByteStreamer`, and `EbookGuy/util/render_template.py:render_page`.
@@ -41,6 +41,6 @@ None.
 - Created: focused search, download, indexing, admin, shared, and database modules, including `inline_queries.py`, `models.py`, `pagination.py`, `rendering.py`, `start_views.py`, `start_delivery.py`, `force_subscription.py`, `progress.py`, `user_info.py`, `file_cleanup.py`, `file_collections.py`, `filter_stats.py`, and `indexing_checkpoints.py`.
 - Moved: plugin implementation modules from `plugins/` into their matching `EbookGuy/features/*` folders; root `utils_*` modules into `EbookGuy/shared/`.
 - Modified: `plugins/commands.py`, `plugins/commands_downloads.py`, `plugins/index.py`, `plugins/pm_filter_callbacks.py`, `plugins/pm_filter_filtering.py`, `plugins/pm_filter_search.py`, `plugins/premium.py`, `plugins/banned.py`, `utils.py`, moved implementation modules with updated import paths, `EbookGuy/features/search/results.py`, `EbookGuy/features/downloads/start.py`, `EbookGuy/features/filters/manual.py`, `EbookGuy/features/filters/global_filters.py`, `EbookGuy/features/filters/premium_callbacks.py`, `EbookGuy/features/indexing/moderation.py`, `EbookGuy/features/indexing/requests.py`, `EbookGuy/shared/filter_parser.py`, `info.py`, and `HANDOFF.md`.
-- Currently Being Edited: none.
-- Planned to Edit: none.
+- Currently Being Edited: callback instrumentation and optimization modules.
+- Planned to Edit: measured slow callback handlers and `HANDOFF.md`.
 - Untouched dependencies/deployment: `requirements.txt` and `Dockerfile`.

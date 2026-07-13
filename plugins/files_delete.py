@@ -8,6 +8,7 @@ from EbookGuy.features.admin.file_cleanup import (
     handle_find_duplicates,
 )
 from info import ADMINS, DELETE_CHANNELS
+from EbookGuy.shared.callback_metrics import measure_callback
 
 
 logger = logging.getLogger(__name__)
@@ -33,5 +34,6 @@ async def find_duplicates(bot, message):
 
 
 @Client.on_callback_query(filters.regex(r"^clean_duplicates"))
+@measure_callback("clean_duplicates")
 async def clean_duplicates(bot, query):
     await handle_clean_duplicates(bot, query)
