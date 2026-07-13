@@ -1,9 +1,9 @@
-import asyncio
 from urllib.parse import quote_plus
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from Script import script
+from EbookGuy.features.search.expiry import SearchExpiry, schedule_search_expiry
 from EbookGuy.features.search.pagination import (
     PaginationState,
     build_file_buttons,
@@ -13,7 +13,7 @@ from EbookGuy.features.search.pagination import (
 )
 from EbookGuy.features.search.state import FRESH, PENDING_SEARCH
 from info import BUTTON_MODE
-from utils import get_cap, save_group_settings, temp
+from utils import get_cap, temp
 
 
 def _store_pending_search(request, key):
@@ -39,13 +39,15 @@ def _alternate_format_button(request, key):
     )
 
 
-def _no_results_markup(request, key):
-    buttons = [[InlineKeyboardButton(
-        "\U0001f50d Check Spelling on Google",
-        url=f"https://www.google.com/search?q={quote_plus(request.name)}+book",
-    )]]
+def _no_results_markup(request, key, settings):
+    buttons = []
+    if settings["search_suggestions_enabled"]:
+        buttons.append([InlineKeyboardButton(
+            "\U0001f50d Check Spelling on Google",
+            url=f"https://www.google.com/search?q={quote_plus(request.name)}+book",
+        )])
     if request.format_type not in {"ebook", "audiobook"}:
-        return InlineKeyboardMarkup(buttons)
+        return InlineKeyboardMarkup(buttons) if buttons else None
     _store_pending_search(request, key)
     buttons.insert(0, [_alternate_format_button(request, key)])
     buttons.append([InlineKeyboardButton(
@@ -55,40 +57,32 @@ def _no_results_markup(request, key):
     return InlineKeyboardMarkup(buttons)
 
 
-async def show_no_results(request):
+async def show_no_results(request, settings):
     key = f"{request.message.chat.id}-{request.message.id}"
     format_labels = {
         "ebook": " (\U0001f4d6 Ebooks)",
         "audiobook": " (\U0001f3a7 Audiobooks)",
     }
-    await request.reply_message.edit_text(
+    result_message = await request.reply_message.edit_text(
         text=(
             f"<b>\u274c No results found for:</b> <i>{request.name}</i>"
             f"{format_labels.get(request.format_type, '')}\n\n"
             + script.NO_RESULTS_MSG.format(request.name, request.name, request.name)
         ),
-        reply_markup=_no_results_markup(request, key),
+        reply_markup=_no_results_markup(request, key, settings),
         disable_web_page_preview=True,
     )
-
-
-async def _delete_search_messages(settings, message, result_message):
-    try:
-        should_delete = settings["auto_delete"]
-    except KeyError:
-        await save_group_settings(message.chat.id, "auto_delete", True)
-        should_delete = True
-    if not should_delete:
-        return
-    await asyncio.sleep(300)
-    await result_message.delete()
-    await message.delete()
+    schedule_search_expiry(SearchExpiry(
+        key=key,
+        delay_seconds=int(settings["search_result_expiry_seconds"]),
+        messages=(request.message, result_message),
+    ))
 
 
 async def _initial_buttons(request, outcome, key):
     message = request.message
     requester_id = message.from_user.id if message.from_user else 0
-    prefix = "filep" if outcome.settings["file_secure"] else "file"
+    prefix = "filep" if outcome.settings["protect_content"] else "file"
     buttons = build_file_buttons(outcome.files, prefix) if BUTTON_MODE else []
     buttons.append(build_pagination_row(PaginationState(
         requester_id=str(requester_id),
@@ -96,17 +90,22 @@ async def _initial_buttons(request, outcome, key):
         offset=0,
         next_offset=normalize_offset(outcome.next_offset),
         total_results=outcome.total_results,
-        page_size=await get_page_size(outcome.settings, message.chat.id),
+        page_size=get_page_size(outcome.settings),
     ), is_initial=True))
     return buttons, prefix, requester_id
 
 
 def _result_caption(outcome, prefix):
+    expiry_seconds = int(outcome.settings["search_result_expiry_seconds"])
     if not BUTTON_MODE:
-        return get_cap(outcome.files, outcome.search, prefix)
+        return get_cap(
+            outcome.files,
+            outcome.search,
+            (prefix, expiry_seconds),
+        )
     return (
         f"<b>The Result for => {outcome.search}\n\n"
-        "\u26a0\ufe0f After 5 minutes this message will be "
+        f"\u26a0\ufe0f After {expiry_seconds} seconds this message will be "
         "Automatically Deleted \U0001f5d1\ufe0f\n\n</b>"
     )
 
@@ -123,4 +122,8 @@ async def show_search_results(request, outcome):
         reply_markup=InlineKeyboardMarkup(buttons),
         disable_web_page_preview=True,
     )
-    await _delete_search_messages(outcome.settings, message, result_message)
+    schedule_search_expiry(SearchExpiry(
+        key=key,
+        delay_seconds=int(outcome.settings["search_result_expiry_seconds"]),
+        messages=(message, result_message),
+    ))
