@@ -3,7 +3,11 @@ import re
 
 from pyrogram.types import InlineKeyboardButton
 
-BTN_URL_REGEX = re.compile(r"(\[([^\[]+?)\]\((buttonurl|buttonalert):(?:/{0,2})(.+?)(:same)?\))")
+
+BTN_URL_REGEX = re.compile(
+    r"(\[([^\[]+?)\]\((buttonurl|buttonalert):"
+    r"(?:/{0,2})(.+?)(:same)?\))"
+)
 
 
 def parse_stored_buttons(buttons):
@@ -11,108 +15,75 @@ def parse_stored_buttons(buttons):
     return ast.literal_eval(buttons)
 
 
-def gfilterparser(text, keyword):
-    if "buttonalert" in text:
-        text = (text.replace("\n", "\\n").replace("\t", "\\t"))
-    buttons = []
-    note_data = ""
-    prev = 0
-    i = 0
-    alerts = []
-    for match in BTN_URL_REGEX.finditer(text):
-        # Check if btnurl is escaped
-        n_escapes = 0
-        to_check = match.start(1) - 1
-        while to_check > 0 and text[to_check] == "\\":
-            n_escapes += 1
-            to_check -= 1
+def _is_escaped(text, match_start):
+    escape_count = 0
+    index = match_start - 1
+    while index > 0 and text[index] == "\\":
+        escape_count += 1
+        index -= 1
+    return escape_count % 2 != 0, index
 
-        # if even, not escaped -> create button
-        if n_escapes % 2 == 0:
-            note_data += text[prev:match.start(1)]
-            prev = match.end(1)
-            if match.group(3) == "buttonalert":
-                # create a thruple with button label, url, and newline status
-                if bool(match.group(5)) and buttons:
-                    buttons[-1].append(InlineKeyboardButton(
-                        text=match.group(2),
-                        callback_data=f"gfilteralert:{i}:{keyword}"
-                    ))
-                else:
-                    buttons.append([InlineKeyboardButton(
-                        text=match.group(2),
-                        callback_data=f"gfilteralert:{i}:{keyword}"
-                    )])
-                i += 1
-                alerts.append(match.group(4))
-            elif bool(match.group(5)) and buttons:
-                buttons[-1].append(InlineKeyboardButton(
-                    text=match.group(2),
-                    url=match.group(4).replace(" ", "")
-                ))
-            else:
-                buttons.append([InlineKeyboardButton(
-                    text=match.group(2),
-                    url=match.group(4).replace(" ", "")
-                )])
 
-        else:
-            note_data += text[prev:to_check]
-            prev = match.start(1) - 1
+def _append_button(buttons, button, same_row):
+    if same_row and buttons:
+        buttons[-1].append(button)
     else:
-        note_data += text[prev:]
+        buttons.append([button])
 
-    return note_data, buttons, alerts
+
+def _parse_filter_buttons(text, keyword, alert_prefix):
+    if "buttonalert" in text:
+        text = text.replace("\n", "\\n").replace("\t", "\\t")
+
+    buttons = []
+    alerts = []
+    note_parts = []
+    previous_end = 0
+    alert_index = 0
+    for match in BTN_URL_REGEX.finditer(text):
+        is_escaped, escape_start = _is_escaped(
+            text,
+            match.start(1),
+        )
+        if is_escaped:
+            note_parts.append(text[previous_end:escape_start])
+            previous_end = match.start(1) - 1
+            continue
+
+        note_parts.append(text[previous_end:match.start(1)])
+        previous_end = match.end(1)
+        same_row = bool(match.group(5))
+        if match.group(3) == "buttonalert":
+            button = InlineKeyboardButton(
+                text=match.group(2),
+                callback_data=(
+                    f"{alert_prefix}:{alert_index}:{keyword}"
+                ),
+            )
+            alert_index += 1
+            alerts.append(match.group(4))
+        else:
+            button = InlineKeyboardButton(
+                text=match.group(2),
+                url=match.group(4).replace(" ", ""),
+            )
+        _append_button(buttons, button, same_row)
+
+    note_parts.append(text[previous_end:])
+    return "".join(note_parts), buttons, alerts
+
+
+def gfilterparser(text, keyword):
+    return _parse_filter_buttons(
+        text,
+        keyword,
+        "gfilteralert",
+    )
+
 
 def parser(text, keyword):
-    if "buttonalert" in text:
-        text = (text.replace("\n", "\\n").replace("\t", "\\t"))
-    buttons = []
-    note_data = ""
-    prev = 0
-    i = 0
-    alerts = []
-    for match in BTN_URL_REGEX.finditer(text):
-        # Check if btnurl is escaped
-        n_escapes = 0
-        to_check = match.start(1) - 1
-        while to_check > 0 and text[to_check] == "\\":
-            n_escapes += 1
-            to_check -= 1
-
-        # if even, not escaped -> create button
-        if n_escapes % 2 == 0:
-            note_data += text[prev:match.start(1)]
-            prev = match.end(1)
-            if match.group(3) == "buttonalert":
-                # create a thruple with button label, url, and newline status
-                if bool(match.group(5)) and buttons:
-                    buttons[-1].append(InlineKeyboardButton(
-                        text=match.group(2),
-                        callback_data=f"alertmessage:{i}:{keyword}"
-                    ))
-                else:
-                    buttons.append([InlineKeyboardButton(
-                        text=match.group(2),
-                        callback_data=f"alertmessage:{i}:{keyword}"
-                    )])
-                i += 1
-                alerts.append(match.group(4))
-            elif bool(match.group(5)) and buttons:
-                buttons[-1].append(InlineKeyboardButton(
-                    text=match.group(2),
-                    url=match.group(4).replace(" ", "")
-                ))
-            else:
-                buttons.append([InlineKeyboardButton(
-                    text=match.group(2),
-                    url=match.group(4).replace(" ", "")
-                )])
-
-        else:
-            note_data += text[prev:to_check]
-            prev = match.start(1) - 1
-    else:
-        note_data += text[prev:]
-
-    return note_data, buttons, alerts
+    return _parse_filter_buttons(
+        text,
+        keyword,
+        "alertmessage",
+    )
