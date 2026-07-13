@@ -4,8 +4,13 @@ from pyrogram.errors import RPCError
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from database.ia_filterdb import delete_checkpoint, get_all_checkpoints, get_checkpoint
+from database.indexing_checkpoints import (
+    delete_checkpoint,
+    get_all_checkpoints,
+    get_checkpoint,
+)
 from info import ADMINS
+from EbookGuy.features.indexing.models import IndexRequest
 from EbookGuy.features.indexing.worker import index_files_to_db, lock
 from utils import temp
 
@@ -24,58 +29,84 @@ async def handle_set_skip_number(bot, message):
         await message.reply(f"**Current skip value:** `{temp.CURRENT}`\n\nUsage: `/setskip <number>`")
 
 
-async def handle_resume_indexing(bot, message):
-    """Resume paused/interrupted indexing from checkpoint."""
-    checkpoints = get_all_checkpoints()
-    
-    if not checkpoints:
-        return await message.reply("❌ No saved indexing progress found.\n\nUse /index to start indexing a new channel.")
-    
-    if len(checkpoints) == 1:
-        # Auto-resume single checkpoint
-        cp = checkpoints[0]
-        chat_id = cp['chat_id']
-        current_msg = cp['current_msg']
-        stats = cp.get('stats', {})
-        
-        if lock.locked():
-            return await message.reply('⏳ Wait until current indexing completes.')
-        
-        try:
-            chat = await bot.get_chat(chat_id)
-            chat_name = chat.title or chat_id
-        except (RPCError, TypeError, ValueError):
-            chat_name = chat_id
-        
-        buttons = [[
-            InlineKeyboardButton('▶️ Resume', callback_data=f'resume_idx#{chat_id}'),
-            InlineKeyboardButton('🗑️ Delete', callback_data=f'delete_cp#{chat_id}')
-        ]]
-        
-        return await message.reply(
-            f"📥 **Saved Indexing Progress**\n\n"
-            f"📋 Channel: `{chat_name}`\n"
-            f"📍 Paused at: Message #{current_msg}\n"
-            f"✅ Saved: {stats.get('total', 0)} files\n"
-            f"🔄 Duplicates: {stats.get('duplicate', 0)}\n\n"
-            f"Choose an action:",
-            reply_markup=InlineKeyboardMarkup(buttons)
+async def _reply_single_checkpoint(bot, message, checkpoint):
+    chat_id = checkpoint["chat_id"]
+    try:
+        chat = await bot.get_chat(chat_id)
+        chat_name = chat.title or chat_id
+    except (RPCError, TypeError, ValueError):
+        chat_name = chat_id
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                "\u25b6\ufe0f Resume",
+                callback_data=f"resume_idx#{chat_id}",
+            ),
+            InlineKeyboardButton(
+                "\U0001f5d1\ufe0f Delete",
+                callback_data=f"delete_cp#{chat_id}",
+            ),
+        ]
+    ]
+    stats = checkpoint.get("stats", {})
+    await message.reply(
+        "\U0001f4e5 **Saved Indexing Progress**\n\n"
+        f"\U0001f4cb Channel: \x60{chat_name}\x60\n"
+        f"\U0001f4cd Paused at: Message #{checkpoint['current_msg']}\n"
+        f"\u2705 Saved: {stats.get('total', 0)} files\n"
+        f"\U0001f504 Duplicates: {stats.get('duplicate', 0)}\n\n"
+        "Choose an action:",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def _reply_checkpoint_list(message, checkpoints):
+    text = "\U0001f4e5 **Saved Indexing Progress**\n\n"
+    buttons = []
+    for index, checkpoint in enumerate(checkpoints[:10], 1):
+        chat_id = checkpoint["chat_id"]
+        saved = checkpoint.get("stats", {}).get("total", 0)
+        text += (
+            f"{index}. Chat \x60{chat_id}\x60 - Message "
+            f"#{checkpoint['current_msg']} ({saved} saved)\n"
         )
-    else:
-        # Multiple checkpoints - show list
-        text = "📥 **Saved Indexing Progress**\n\n"
-        buttons = []
-        for i, cp in enumerate(checkpoints[:10], 1):
-            chat_id = cp['chat_id']
-            current_msg = cp['current_msg']
-            stats = cp.get('stats', {})
-            text += f"{i}. Chat `{chat_id}` - Message #{current_msg} ({stats.get('total', 0)} saved)\n"
-            buttons.append([
-                InlineKeyboardButton(f'▶️ Resume #{i}', callback_data=f'resume_idx#{chat_id}'),
-                InlineKeyboardButton(f'🗑️', callback_data=f'delete_cp#{chat_id}')
-            ])
-        
-        return await message.reply(text, reply_markup=InlineKeyboardMarkup(buttons))
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    f"\u25b6\ufe0f Resume #{index}",
+                    callback_data=f"resume_idx#{chat_id}",
+                ),
+                InlineKeyboardButton(
+                    "\U0001f5d1\ufe0f",
+                    callback_data=f"delete_cp#{chat_id}",
+                ),
+            ]
+        )
+    await message.reply(
+        text,
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def handle_resume_indexing(bot, message):
+    """Show actions for saved indexing checkpoints."""
+    checkpoints = await get_all_checkpoints()
+    if not checkpoints:
+        await message.reply(
+            "\u274c No saved indexing progress found.\n\n"
+            "Use /index to start indexing a new channel."
+        )
+        return
+    if len(checkpoints) == 1:
+        if lock.locked():
+            await message.reply(
+                "\u23f3 Wait until current indexing completes."
+            )
+            return
+        await _reply_single_checkpoint(bot, message, checkpoints[0])
+        return
+    await _reply_checkpoint_list(message, checkpoints)
 
 
 async def handle_resume_callback(bot, query):
@@ -88,7 +119,7 @@ async def handle_resume_callback(bot, query):
     except (RPCError, TypeError, ValueError):
         logger.debug("Using non-numeric checkpoint chat identifier: %s", chat_id)
     
-    cp = get_checkpoint(chat_id)
+    cp = await get_checkpoint(chat_id)
     if not cp:
         return await query.answer("Checkpoint not found!", show_alert=True)
     
@@ -112,7 +143,13 @@ async def handle_resume_callback(bot, query):
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⏸️ Pause', callback_data='index_cancel')]])
     )
     
-    await index_files_to_db(last_msg_id, chat_id, query.message, bot, resume=True)
+    await index_files_to_db(IndexRequest(
+        last_message_id=last_msg_id,
+        chat_id=chat_id,
+        status_message=query.message,
+        bot=bot,
+        should_resume=True,
+    ))
 
 
 async def handle_delete_checkpoint_callback(bot, query):
@@ -125,6 +162,6 @@ async def handle_delete_checkpoint_callback(bot, query):
     except (RPCError, TypeError, ValueError):
         logger.debug("Using non-numeric checkpoint chat identifier: %s", chat_id)
     
-    delete_checkpoint(chat_id)
+    await delete_checkpoint(chat_id)
     await query.answer("Checkpoint deleted!")
     await query.message.edit("🗑️ Checkpoint deleted successfully.")
