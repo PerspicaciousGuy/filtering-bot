@@ -3,6 +3,7 @@ from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery
 
 from EbookGuy.shared.callback_metrics import measure_callback
+from EbookGuy.features.admin.settings_input import is_settings_input_active
 from plugins.pm_filter_callbacks import handle_callback
 from plugins.pm_filter_search import (
     handle_format_selection,
@@ -17,6 +18,8 @@ logger.setLevel(logging.ERROR)
 
 @Client.on_message(filters.private & filters.text & filters.incoming)
 async def pm_text(bot, message):
+    if is_settings_input_active(message.from_user.id):
+        return
     await handle_private_text(bot, message)
 
 
