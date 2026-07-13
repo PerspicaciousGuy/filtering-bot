@@ -1,6 +1,16 @@
+from dataclasses import dataclass
+
 import motor.motor_asyncio
 from pymongo.errors import DuplicateKeyError
 from info import AUTH_CHANNEL, OTHER_DB_URI
+
+
+@dataclass(frozen=True)
+class JoinRequestUser:
+    user_id: int
+    first_name: str
+    username: str | None
+    date: object
 
 class JoinReqs:
 
@@ -14,15 +24,26 @@ class JoinReqs:
             self.db = None
             self.col = None
 
-    def isActive(self):
-        if self.client is not None:
-            return True
-        else:
-            return False
+    def is_active(self):
+        return self.client is not None
 
-    async def add_user(self, user_id, first_name, username, date):
+    def isActive(self):
+        """Compatibility alias for the original camel-case API."""
+        return self.is_active()
+
+    async def add_user(self, user, *legacy_fields):
+        """Store a join request, accepting both request objects and legacy fields."""
+        if not isinstance(user, JoinRequestUser):
+            first_name, username, date = legacy_fields
+            user = JoinRequestUser(user, first_name, username, date)
         try:
-            await self.col.insert_one({"_id": int(user_id),"user_id": int(user_id), "first_name": first_name, "username": username, "date": date})
+            await self.col.insert_one({
+                "_id": int(user.user_id),
+                "user_id": int(user.user_id),
+                "first_name": user.first_name,
+                "username": user.username,
+                "date": user.date,
+            })
         except DuplicateKeyError:
             return
 
