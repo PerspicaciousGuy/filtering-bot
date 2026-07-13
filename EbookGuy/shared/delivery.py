@@ -1,19 +1,37 @@
+from dataclasses import dataclass
+
 from pyrogram.errors import PeerIdInvalid, RPCError, UserIsBlocked
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from info import CHNL_LNK, GRP_LNK, OWNER_LNK
 
 
-async def send_all(bot, userid, files, ident, chat_id, user_name, query):
-    """Send all files to user directly (no shortlinks)"""
+@dataclass(frozen=True)
+class SendAllRequest:
+    bot: object
+    user_id: int
+    files: list
+    identifier: str
+    query: object
+
+
+def _normalize_request(request, legacy_args):
+    if isinstance(request, SendAllRequest):
+        return request
+    user_id, files, identifier, _chat_id, _user_name, query = legacy_args
+    return SendAllRequest(request, user_id, files, identifier, query)
+
+
+async def send_all(request, *legacy_args):
+    """Send all files directly while preserving the original positional API."""
+    request = _normalize_request(request, legacy_args)
     try:
-        for file in files:
-            f_caption = file["caption"]
-            await bot.send_cached_media(
-                chat_id=userid,
+        for file in request.files:
+            await request.bot.send_cached_media(
+                chat_id=request.user_id,
                 file_id=file["file_id"],
-                caption=f_caption,
-                protect_content=True if ident == "filep" else False,
+                caption=file["caption"],
+                protect_content=request.identifier == "filep",
                 reply_markup=InlineKeyboardMarkup(
                     [[
                         InlineKeyboardButton('Support Group', url=GRP_LNK),
@@ -24,8 +42,12 @@ async def send_all(bot, userid, files, ident, chat_id, user_name, query):
                 )
             )
     except UserIsBlocked:
-        await query.answer('Unblock the bot mahn !', show_alert=True)
-    except PeerIdInvalid:
-        await query.answer('Hey, Start Bot First And Click Send All', show_alert=True)
-    except RPCError:
-        await query.answer('Hey, Start Bot First And Click Send All', show_alert=True)
+        await request.query.answer(
+            "Unblock the bot mahn !",
+            show_alert=True,
+        )
+    except (PeerIdInvalid, RPCError):
+        await request.query.answer(
+            "Hey, Start Bot First And Click Send All",
+            show_alert=True,
+        )
