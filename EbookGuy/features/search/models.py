@@ -24,6 +24,7 @@ class NextPageView:
     search: str
     prefix: str
     buttons: list
+    expiry_seconds: int
 
 
 @dataclass(frozen=True)
