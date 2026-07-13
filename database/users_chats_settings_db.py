@@ -29,7 +29,7 @@ class ChatSettingsMixin:
                 is_disabled=False,
                 reason="",
             ),
-            settings=default_setgs
+            settings=default_setgs.copy()
         )
 
     async def add_chat(self, chat, title):
@@ -53,13 +53,8 @@ class ChatSettingsMixin:
     async def get_settings(self, id):
         chat = await self.grp.find_one({'id':int(id)})
         if chat:
-            settings = chat.get('settings', default_setgs)
-            # Merge with defaults to ensure all keys exist
-            for key, value in default_setgs.items():
-                if key not in settings:
-                    settings[key] = value
-            return settings
-        return default_setgs
+            return {**default_setgs, **chat.get('settings', {})}
+        return default_setgs.copy()
 
     async def disable_chat(self, chat, reason="No Reason"):
         chat_status=dict(
