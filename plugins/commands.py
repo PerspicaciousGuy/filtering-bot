@@ -13,6 +13,8 @@ from EbookGuy.features.admin.commands import (
     handle_stats,
     handle_stop_button,
 )
+from EbookGuy.features.admin.settings_callbacks import handle_settings_callback
+from EbookGuy.features.admin.settings_commands import handle_settings_command
 from EbookGuy.features.downloads.conversion import (
     handle_convert_back_callback,
     handle_convert_menu_callback,
@@ -57,6 +59,20 @@ async def convert_back_callback(client, query):
 @Client.on_message(filters.command('channel') & filters.user(ADMINS))
 async def channel_info(bot, message):
     await handle_channel_info(bot, message)
+
+
+@Client.on_message(
+    filters.command("settings") & filters.user(ADMINS) & filters.private
+)
+@measure_command("settings")
+async def settings_command(client, message):
+    await handle_settings_command(client, message)
+
+
+@Client.on_callback_query(filters.regex(r"^global_settings:"))
+@measure_callback("global_settings")
+async def settings_callback(client, query):
+    await handle_settings_callback(client, query)
 
 
 @Client.on_message(filters.command('logs') & filters.user(ADMINS))
