@@ -1,5 +1,5 @@
 from EbookGuy.shared.broadcast import broadcast_messages, broadcast_messages_group
-from EbookGuy.shared.delivery import send_all
+from EbookGuy.shared.delivery import SendAllRequest, send_all
 from EbookGuy.shared.filter_parser import BTN_URL_REGEX, gfilterparser, parser
 from EbookGuy.shared.formatting import get_cap, get_size, last_online, list_to_str, split_list
 from EbookGuy.shared.message import extract_user, get_file_id, is_admin_or_owner
@@ -24,6 +24,7 @@ __all__ = [
     "parser",
     "pub_is_subscribed",
     "save_group_settings",
+    "SendAllRequest",
     "send_all",
     "split_list",
     "temp",
