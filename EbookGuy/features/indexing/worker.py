@@ -5,181 +5,185 @@ import time
 from pyrogram import enums
 from pyrogram.errors import FloodWait, MessageNotModified, RPCError
 from pymongo.errors import PyMongoError
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import (
+    is_allowed_file,
+    save_file,
+)
+from database.indexing_checkpoints import (
     delete_checkpoint,
     get_checkpoint,
-    is_allowed_file,
     save_checkpoint,
-    save_file,
+)
+from EbookGuy.bot import MessageRange
+from EbookGuy.features.indexing.models import IndexState
+from EbookGuy.features.indexing.progress import (
+    completion_text,
+    failure_text,
+    format_progress,
+    pause_markup,
+    paused_text,
+    rate_limit_text,
 )
 from info import FILTER_BY_EXTENSION
 from utils import temp
 
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 lock = asyncio.Lock()
+CHECKPOINT_INTERVAL = 100
+PROGRESS_UPDATE_INTERVAL = 3
+INDEXING_ERRORS = (
+    KeyError,
+    OSError,
+    PyMongoError,
+    RPCError,
+    TypeError,
+    ValueError,
+)
+DEFAULT_STATS = {
+    "total": 0,
+    "duplicate": 0,
+    "errors": 0,
+    "deleted": 0,
+    "no_media": 0,
+    "unsupported": 0,
+    "filtered": 0,
+}
 
-CHECKPOINT_INTERVAL = 100      # Save checkpoint every N messages
-PROGRESS_UPDATE_INTERVAL = 3   # Update progress every N seconds
 
-def format_progress(current, stats, paused=False):
-    """Format progress message for indexing."""
-    status = "⏸️ **Paused**" if paused else "📥 **Indexing...**"
-    filtered_text = f"\n🚫 Filtered: `{stats.get('filtered', 0)}`" if FILTER_BY_EXTENSION else ""
-    return (
-        f"{status}\n\n"
-        f"📊 Messages processed: `{current}`\n"
-        f"✅ Saved: `{stats['total']}`\n"
-        f"🔄 Duplicates: `{stats['duplicate']}`\n"
-        f"🗑️ Deleted: `{stats['deleted']}`\n"
-        f"📄 No media: `{stats['no_media']}`\n"
-        f"⚠️ Unsupported: `{stats['unsupported']}`"
-        f"{filtered_text}\n"
-        f"❌ Errors: `{stats['errors']}`"
+async def _load_state(request):
+    checkpoint = (
+        await get_checkpoint(request.chat_id)
+        if request.should_resume
+        else None
+    )
+    stats = dict(checkpoint.get("stats", DEFAULT_STATS)) if checkpoint else dict(DEFAULT_STATS)
+    start_from = checkpoint["current_msg"] if checkpoint else temp.CURRENT
+    return IndexState(start_from, start_from, stats, time.time())
+
+
+async def _update_progress(request, state):
+    if time.time() - state.last_update <= PROGRESS_UPDATE_INTERVAL:
+        return
+    try:
+        await request.status_message.edit_text(
+            format_progress(state.current_message, state.stats),
+            reply_markup=pause_markup(),
+        )
+    except MessageNotModified:
+        logger.debug("Indexing progress message is already current")
+    state.last_update = time.time()
+
+
+async def _pause_if_requested(request, state):
+    if not temp.CANCEL:
+        return False
+    await save_checkpoint(request.chat_id, state.current_message, state.stats)
+    await request.status_message.edit(
+        paused_text(state.current_message, state.stats)
+    )
+    return True
+
+
+def _get_supported_media(message, stats):
+    if message.empty:
+        stats["deleted"] += 1
+        return None
+    if not message.media:
+        stats["no_media"] += 1
+        return None
+    supported = {
+        enums.MessageMediaType.VIDEO,
+        enums.MessageMediaType.AUDIO,
+        enums.MessageMediaType.DOCUMENT,
+    }
+    if message.media not in supported:
+        stats["unsupported"] += 1
+        return None
+    media = getattr(message, message.media.value, None)
+    if media is None:
+        stats["unsupported"] += 1
+    return media
+
+
+async def _save_media(message, state):
+    media = _get_supported_media(message, state.stats)
+    if media is None:
+        return
+    if FILTER_BY_EXTENSION and not is_allowed_file(getattr(media, "file_name", "")):
+        state.stats["filtered"] += 1
+        return
+    media.caption = message.caption
+    try:
+        success, code = await save_file(media)
+        if success:
+            state.stats["total"] += 1
+        elif code == 0:
+            state.stats["duplicate"] += 1
+        elif code == 2:
+            state.stats["errors"] += 1
+    except INDEXING_ERRORS:
+        state.stats["errors"] += 1
+        logger.exception("Failed to save indexed file")
+
+
+async def _index_messages(request, state):
+    messages = request.bot.iter_messages(MessageRange(
+        chat_id=request.chat_id,
+        limit=request.last_message_id,
+        offset=state.start_from,
+    ))
+    async for message in messages:
+        if await _pause_if_requested(request, state):
+            return False
+        state.current_message += 1
+        await _update_progress(request, state)
+        if state.current_message % CHECKPOINT_INTERVAL == 0:
+            await save_checkpoint(
+                request.chat_id,
+                state.current_message,
+                state.stats,
+            )
+        await _save_media(message, state)
+    return True
+
+
+async def _handle_flood_wait(request, state, error):
+    await save_checkpoint(request.chat_id, state.current_message, state.stats)
+    wait_time = error.value + 5
+    await request.status_message.edit(
+        rate_limit_text(state.current_message, state.stats, wait_time)
+    )
+    await asyncio.sleep(wait_time)
+    await request.status_message.edit("\u25b6\ufe0f Resuming indexing...")
+    state.start_from = state.current_message
+
+
+async def _handle_failure(request, state):
+    await save_checkpoint(request.chat_id, state.current_message, state.stats)
+    logger.exception("Indexing failed unexpectedly")
+    await request.status_message.edit(
+        failure_text(state.current_message, state.stats)
     )
 
 
-async def index_files_to_db(lst_msg_id, chat, msg, bot, resume=False):
-    """
-    Index files from a channel to database.
-    
-    Features:
-    - Resume from checkpoint
-    - Extension filtering (ebooks/audiobooks)
-    - FloodWait handling with auto-retry
-    - Progress saving every 100 messages
-    - Time-based progress updates
-    """
-    
-    # Initialize or restore stats
-    if resume:
-        cp = get_checkpoint(chat)
-        if cp:
-            stats = cp.get('stats', {
-                'total': 0, 'duplicate': 0, 'errors': 0,
-                'deleted': 0, 'no_media': 0, 'unsupported': 0, 'filtered': 0
-            })
-            start_from = cp['current_msg']
-        else:
-            stats = {'total': 0, 'duplicate': 0, 'errors': 0, 'deleted': 0, 'no_media': 0, 'unsupported': 0, 'filtered': 0}
-            start_from = temp.CURRENT
-    else:
-        stats = {'total': 0, 'duplicate': 0, 'errors': 0, 'deleted': 0, 'no_media': 0, 'unsupported': 0, 'filtered': 0}
-        start_from = temp.CURRENT
-    
-    current = start_from
-    last_update = time.time()
-    
+async def index_files_to_db(request):
+    """Index channel media while preserving resumable checkpoint state."""
+    state = await _load_state(request)
     async with lock:
         temp.CANCEL = False
-        try:
-            async for message in bot.iter_messages(chat, lst_msg_id, start_from):
-                # Check for cancel/pause
-                if temp.CANCEL:
-                    save_checkpoint(chat, current, stats)
-                    await msg.edit(
-                        f"⏸️ **Indexing Paused!**\n\n"
-                        f"Progress saved at message #{current}\n"
-                        f"Use /resume to continue.\n\n"
-                        + format_progress(current, stats, paused=True)
-                    )
+        while True:
+            try:
+                if not await _index_messages(request, state):
                     return
-                
-                current += 1
-                
-                # Time-based progress update (every 3 seconds)
-                if time.time() - last_update > PROGRESS_UPDATE_INTERVAL:
-                    try:
-                        await msg.edit_text(
-                            format_progress(current, stats),
-                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⏸️ Pause', callback_data='index_cancel')]])
-                        )
-                    except MessageNotModified:
-                        logger.debug("Indexing progress message is already current")
-                    last_update = time.time()
-                
-                # Save checkpoint periodically
-                if current % CHECKPOINT_INTERVAL == 0:
-                    save_checkpoint(chat, current, stats)
-                
-                # Handle deleted/empty messages
-                if message.empty:
-                    stats['deleted'] += 1
-                    continue
-                
-                # Handle non-media messages
-                if not message.media:
-                    stats['no_media'] += 1
-                    continue
-                
-                # Handle unsupported media types
-                if message.media not in [enums.MessageMediaType.VIDEO, enums.MessageMediaType.AUDIO, enums.MessageMediaType.DOCUMENT]:
-                    stats['unsupported'] += 1
-                    continue
-                
-                media = getattr(message, message.media.value, None)
-                if not media:
-                    stats['unsupported'] += 1
-                    continue
-                
-                # Filter by extension (ebooks/audiobooks only)
-                if FILTER_BY_EXTENSION and not is_allowed_file(getattr(media, 'file_name', '')):
-                    stats['filtered'] += 1
-                    continue
-                
-                # Save the file
-                media.caption = message.caption
-                try:
-                    success, code = await save_file(media)
-                    if success:
-                        stats['total'] += 1
-                    elif code == 0:
-                        stats['duplicate'] += 1
-                    elif code == 2:
-                        stats['errors'] += 1
-                except (KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
-                    stats['errors'] += 1
-                    logger.exception("Failed to save indexed file")
-                    
-        except FloodWait as e:
-            # Save progress before waiting
-            save_checkpoint(chat, current, stats)
-            wait_time = e.value + 5
-            await msg.edit(
-                f"⏳ **Rate Limited!**\n\n"
-                f"Waiting {wait_time} seconds...\n"
-                f"Progress saved at message #{current}\n\n"
-                + format_progress(current, stats)
-            )
-            await asyncio.sleep(wait_time)
-            # Resume after wait
-            await msg.edit("▶️ Resuming indexing...")
-            return await index_files_to_db(lst_msg_id, chat, msg, bot, resume=True)
-            
-        except (KeyError, OSError, PyMongoError, RPCError, TypeError, ValueError):
-            save_checkpoint(chat, current, stats)
-            logger.exception("Indexing failed unexpectedly")
-            await msg.edit(
-                f"**Indexing failed unexpectedly.**\n\n"
-                f"Progress saved at message #{current}\n"
-                f"Use /resume to continue.\n\n"
-                + format_progress(current, stats)
-            )
-            return
-        
-        # Successful completion
-        delete_checkpoint(chat)
-        filtered_text = f"\n🚫 Filtered out: `{stats['filtered']}`" if FILTER_BY_EXTENSION else ""
-        await msg.edit(
-            f"✅ **Indexing Complete!**\n\n"
-            f"📊 Total messages: `{current}`\n"
-            f"✅ Files saved: `{stats['total']}`\n"
-            f"🔄 Duplicates skipped: `{stats['duplicate']}`\n"
-            f"🗑️ Deleted messages: `{stats['deleted']}`\n"
-            f"📄 Non-media: `{stats['no_media']}`\n"
-            f"⚠️ Unsupported: `{stats['unsupported']}`"
-            f"{filtered_text}\n"
-            f"❌ Errors: `{stats['errors']}`"
+                break
+            except FloodWait as error:
+                await _handle_flood_wait(request, state, error)
+            except INDEXING_ERRORS:
+                await _handle_failure(request, state)
+                return
+        await delete_checkpoint(request.chat_id)
+        await request.status_message.edit(
+            completion_text(state.current_message, state.stats)
         )
