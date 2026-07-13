@@ -4,11 +4,11 @@ import base64
 import logging
 import re
 from struct import pack
-from dataclasses import dataclass
 from pyrogram.file_id import FileId
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from database.file_collections import col, sec_col
 from database import indexing_checkpoints as checkpoint_store
+from database.search_repository import SearchRequest, get_search_results
 from info import (
     ALLOWED_EXTENSIONS,
     FILTER_BY_EXTENSION,
@@ -117,108 +117,6 @@ async def is_file_already_saved(file_id, file_name):
             return True
             
     return False
-
-@dataclass(frozen=True)
-class SearchRequest:
-    query: str
-    max_results: int = 10
-    offset: int = 0
-    format_type: str | None = None
-
-
-def _compile_search_regex(query):
-    normalized_query = query.strip()
-    if not normalized_query:
-        raw_pattern = "."
-    elif " " not in normalized_query:
-        raw_pattern = (
-            r"(\b|[\.\+\-_])"
-            + normalized_query
-            + r"(\b|[\.\+\-_])"
-        )
-    else:
-        raw_pattern = normalized_query.replace(
-            " ",
-            r".*[\s\.\+\-_]",
-        )
-    try:
-        return re.compile(raw_pattern, flags=re.IGNORECASE)
-    except re.error:
-        return normalized_query
-
-
-def _build_search_filter(query, format_type):
-    name_regex = _compile_search_regex(query)
-    audio_pattern = (
-        r"\s(mp3|m4a|m4b|aac|ogg|flac|wav|wma|zip)(\s|$)"
-    )
-    audio_regex = re.compile(audio_pattern, flags=re.IGNORECASE)
-    if format_type == "ebook":
-        return {
-            "$and": [
-                {"file_name": name_regex},
-                {"file_name": {"$not": audio_regex}},
-            ]
-        }
-    if format_type == "audiobook":
-        return {
-            "$and": [
-                {"file_name": name_regex},
-                {"file_name": audio_regex},
-            ]
-        }
-    return {"file_name": name_regex}
-
-
-async def _find_search_files(search_filter, request):
-    if not MULTIPLE_DATABASE:
-        cursor = (
-            col.find(search_filter)
-            .sort("$natural", -1)
-            .skip(request.offset)
-            .limit(request.max_results)
-        )
-        return await cursor.to_list(length=request.max_results)
-
-    primary_count = await col.count_documents(search_filter)
-    files = []
-    if request.offset < primary_count:
-        primary_cursor = (
-            col.find(search_filter)
-            .sort("$natural", -1)
-            .skip(request.offset)
-            .limit(request.max_results)
-        )
-        files.extend(
-            await primary_cursor.to_list(length=request.max_results)
-        )
-
-    if len(files) < request.max_results:
-        remaining = request.max_results - len(files)
-        secondary_offset = max(0, request.offset - primary_count)
-        secondary_cursor = (
-            sec_col.find(search_filter)
-            .sort("$natural", -1)
-            .skip(secondary_offset)
-            .limit(remaining)
-        )
-        files.extend(await secondary_cursor.to_list(length=remaining))
-    return files
-
-
-async def get_search_results(request):
-    """Return matching files, the next offset, and total result count."""
-    search_filter = _build_search_filter(
-        request.query,
-        request.format_type,
-    )
-    files = await _find_search_files(search_filter, request)
-    total_results = await col.count_documents(search_filter)
-    if MULTIPLE_DATABASE:
-        total_results += await sec_col.count_documents(search_filter)
-    consumed = request.offset + request.max_results
-    next_offset = "" if consumed >= total_results else consumed
-    return files, next_offset, total_results
 
 async def get_bad_files(query, file_type=None, use_filter=False):
     """For given query return (results, next_offset)"""
