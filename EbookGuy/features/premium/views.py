@@ -5,7 +5,11 @@ from pyrogram.errors import MessageNotModified
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.users_chats_db import db
-from info import FREE_DAILY_LIMIT, PREMIUM_PRICES
+from EbookGuy.shared.global_settings import (
+    describe_daily_limit,
+    get_global_settings,
+)
+from info import PREMIUM_PRICES
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +31,7 @@ def get_readable_time(seconds):
     return f"{days} days"
 
 
-def _premium_status_text(is_premium, expiry):
+def _premium_status_text(is_premium, expiry, settings):
     if is_premium and expiry:
         time_left = (expiry - datetime.datetime.now()).total_seconds()
         return (
@@ -35,18 +39,20 @@ def _premium_status_text(is_premium, expiry):
             f"\u23f0 <b>Expires:</b> {expiry.strftime('%d %B %Y, %I:%M %p')}\n"
             f"\u231b <b>Time Left:</b> {get_readable_time(time_left)}\n"
         )
+    free_limit = settings["free_daily_limit"] or "Unlimited"
     return (
         "\U0001f4ca <b>Your Status:</b> Free User\n"
-        f"\U0001f4e5 <b>Daily Limit:</b> {FREE_DAILY_LIMIT} downloads/day\n"
+        f"\U0001f4e5 <b>Daily Limit:</b> {free_limit} downloads/day\n"
     )
 
 
-def _premium_plan_text(is_premium, expiry):
-    status_text = _premium_status_text(is_premium, expiry)
+def _premium_plan_text(is_premium, expiry, settings):
+    status_text = _premium_status_text(is_premium, expiry, settings)
+    benefit = describe_daily_limit(settings["premium_daily_limit"])
     return f"""{status_text}
 <b>\u2b50 Premium Benefits:</b>
 
-\u2705 <b>Unlimited Downloads</b> - No daily limits
+\u2705 <b>{benefit}</b>
 \u2705 <b>Direct Access</b> - No waiting or ads
 \u2705 <b>Priority Support</b> - Faster responses
 \u2705 <b>Support Development</b> - Help us keep the bot running
@@ -62,7 +68,7 @@ def _premium_plan_text(is_premium, expiry):
 \U0001f4da <b>About Premium:</b>
 \u2022 Premium doesn't guarantee all books are available
 \u2022 Some books may not be in our database
-\u2022 Premium removes download limits, not book availability
+\u2022 Premium raises download limits, not book availability
 
 \U0001f4a1 <i>If you already have a plan, buying again will extend it automatically</i>
 
@@ -93,33 +99,41 @@ def _premium_plan_markup():
     return InlineKeyboardMarkup(buttons)
 
 
-def _account_status_text(is_premium, expiry, daily_downloads):
+def _account_status_text(is_premium, expiry, usage):
+    daily_downloads = usage["daily_downloads"]
     if is_premium and expiry:
         time_left = (expiry - datetime.datetime.now()).total_seconds()
+        daily_limit = usage["premium_daily_limit"] or "Unlimited"
         return f"""<b>\U0001f464 Your Account Status</b>
 
 \u2b50 <b>Plan:</b> Premium User
 \U0001f4c5 <b>Expires:</b> {expiry.strftime('%d %B %Y, %I:%M %p')}
 \u231b <b>Time Left:</b> {get_readable_time(time_left)}
-\U0001f4e5 <b>Today's Downloads:</b> Unlimited \u221e
+\U0001f4e5 <b>Today's Downloads:</b> {daily_downloads}/{daily_limit}
 
 <i>Thank you for supporting us! \u2764\ufe0f</i>"""
 
-    remaining = max(0, FREE_DAILY_LIMIT - daily_downloads)
+    free_limit = usage["free_daily_limit"]
+    remaining = "Unlimited" if free_limit == 0 else max(
+        0,
+        free_limit - daily_downloads,
+    )
+    limit_text = free_limit or "Unlimited"
     return f"""<b>\U0001f464 Your Account Status</b>
 
 \U0001f4ca <b>Plan:</b> Free User
-\U0001f4e5 <b>Today's Downloads:</b> {daily_downloads}/{FREE_DAILY_LIMIT}
+\U0001f4e5 <b>Today's Downloads:</b> {daily_downloads}/{limit_text}
 \U0001f4c8 <b>Remaining:</b> {remaining} downloads
 
-<i>Upgrade to Premium for unlimited downloads!</i>"""
+<i>Upgrade to Premium for higher download limits!</i>"""
 
 
 async def handle_premium_command(client, message):
     """Show premium plans and purchase options."""
     is_premium, expiry = await db.get_premium_status(message.from_user.id)
+    settings = await get_global_settings()
     await message.reply_text(
-        _premium_plan_text(is_premium, expiry),
+        _premium_plan_text(is_premium, expiry, settings),
         reply_markup=_premium_plan_markup(),
         disable_web_page_preview=True,
     )
@@ -130,6 +144,7 @@ async def handle_my_status_command(client, message):
     user_id = message.from_user.id
     is_premium, expiry = await db.get_premium_status(user_id)
     daily_downloads = await db.get_daily_downloads(user_id)
+    settings = await get_global_settings()
     reply_markup = None
     if not (is_premium and expiry):
         reply_markup = InlineKeyboardMarkup(
@@ -141,7 +156,15 @@ async def handle_my_status_command(client, message):
             ]]
         )
     await message.reply_text(
-        _account_status_text(is_premium, expiry, daily_downloads),
+        _account_status_text(
+            is_premium,
+            expiry,
+            {
+                "daily_downloads": daily_downloads,
+                "free_daily_limit": settings["free_daily_limit"],
+                "premium_daily_limit": settings["premium_daily_limit"],
+            },
+        ),
         reply_markup=reply_markup,
     )
 
@@ -149,9 +172,10 @@ async def handle_my_status_command(client, message):
 async def handle_show_premium_callback(client, query):
     """Edit the current message to show premium plans."""
     is_premium, expiry = await db.get_premium_status(query.from_user.id)
+    settings = await get_global_settings()
     try:
         await query.message.edit_text(
-            _premium_plan_text(is_premium, expiry),
+            _premium_plan_text(is_premium, expiry, settings),
             reply_markup=_premium_plan_markup(),
             disable_web_page_preview=True,
         )
