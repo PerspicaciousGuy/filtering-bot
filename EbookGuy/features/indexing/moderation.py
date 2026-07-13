@@ -1,6 +1,7 @@
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from info import ADMINS
+from EbookGuy.features.indexing.models import IndexRequest
 from EbookGuy.features.indexing.worker import index_files_to_db, lock
 from utils import temp
 
@@ -39,4 +40,9 @@ async def handle_index_files(bot, query):
         chat_id = int(chat)
     except ValueError:
         chat_id = chat
-    await index_files_to_db(int(lst_msg_id), chat_id, msg, bot)
+    await index_files_to_db(IndexRequest(
+        last_message_id=int(lst_msg_id),
+        chat_id=chat_id,
+        status_message=msg,
+        bot=bot,
+    ))
