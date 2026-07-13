@@ -4,6 +4,10 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, PreChecko
 from pyrogram.errors import MessageNotModified, RPCError
 from pymongo.errors import PyMongoError
 from database.users_chats_db import db
+from EbookGuy.shared.global_settings import (
+    describe_daily_limit,
+    get_global_settings,
+)
 from info import PREMIUM_PRICES, PREMIUM_PRICES_INR, PAYMENT_WEBSITE
 
 logger = logging.getLogger(__name__)
@@ -55,6 +59,10 @@ async def handle_confirm_premium_callback(client, query):
     days = int(query.data.split("_")[2])
     stars = PREMIUM_PRICES.get(days)
     user_id = query.from_user.id
+    settings = await get_global_settings()
+    download_benefit = describe_daily_limit(
+        settings["premium_daily_limit"]
+    ).lower()
     
     if not stars:
         return await query.answer("Invalid plan!", show_alert=True)
@@ -77,7 +85,10 @@ async def handle_confirm_premium_callback(client, query):
         invoice_msg = await client.send_invoice(
             chat_id=user_id,
             title=f"Premium - {days} Day{'s' if days > 1 else ''}",
-            description=f"Get {days} day{'s' if days > 1 else ''} of Premium access with unlimited downloads. If you already have Premium, this will extend your existing plan.",
+            description=(
+                f"Get {days} day{'s' if days > 1 else ''} of Premium "
+                f"access with {download_benefit}. Existing Premium is extended."
+            ),
             payload=f"premium_{days}_{user_id}",
             currency="XTR",  # Telegram Stars
             prices=[LabeledPrice(label=f"{days} Day{'s' if days > 1 else ''} Premium", amount=stars)]
@@ -124,6 +135,10 @@ async def handle_successful_payment_handler(client, message):
             new_expiry = await db.set_premium(user_id, days)
             
             if new_expiry:
+                settings = await get_global_settings()
+                download_benefit = describe_daily_limit(
+                    settings["premium_daily_limit"]
+                )
                 text = f"""
 🎉 <b>Payment Successful!</b>
 
@@ -133,8 +148,7 @@ async def handle_successful_payment_handler(client, message):
 💰 <b>Stars Paid:</b> {payment.total_amount} ⭐
 
 <b>You now have:</b>
-✅ Unlimited downloads
-✅ No daily limits
+✅ {download_benefit}
 ✅ Direct access to all files
 
 <i>Thank you for supporting us! ❤️</i>
