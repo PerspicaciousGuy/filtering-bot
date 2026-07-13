@@ -1,6 +1,6 @@
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from EbookGuy.features.search.results import auto_filter
+from EbookGuy.features.search.results import AutoFilterRequest, auto_filter
 from EbookGuy.features.search.state import MockMessage, PENDING_SEARCH
 
 
@@ -52,9 +52,16 @@ async def handle_format_selection(bot, query):
     # Create mock message using the top-level MockMessage class
     mock_msg = MockMessage(query, pending)
     
-    # Call auto_filter with the format type
-    ai_search = True
-    await auto_filter(bot, pending['query'], mock_msg, query.message, ai_search, format_type=format_type if format_type != "all" else None)
+    await auto_filter(
+        AutoFilterRequest(
+            name=pending["query"],
+            message=mock_msg,
+            reply_message=query.message,
+            format_type=(
+                format_type if format_type != "all" else None
+            ),
+        )
+    )
 
 
 async def handle_switch_format(bot, query):
@@ -75,6 +82,13 @@ async def handle_switch_format(bot, query):
     # Create mock message using the top-level MockMessage class
     mock_msg = MockMessage(query, pending)
     
-    # Call auto_filter with the new format type
-    ai_search = True
-    await auto_filter(bot, pending['query'], mock_msg, query.message, ai_search, format_type=format_type if format_type != "all" else None)
+    await auto_filter(
+        AutoFilterRequest(
+            name=pending["query"],
+            message=mock_msg,
+            reply_message=query.message,
+            format_type=(
+                format_type if format_type != "all" else None
+            ),
+        )
+    )
