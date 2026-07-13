@@ -3,6 +3,10 @@ import logging
 from pyrogram.errors import RPCError
 
 from database.users_chats_db import db
+from EbookGuy.shared.global_settings import (
+    describe_daily_limit,
+    get_global_settings,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -18,13 +22,17 @@ async def handle_add_premium_command(client, message):
         
         new_expiry = await db.set_premium(user_id, days)
         if new_expiry:
+            settings = await get_global_settings()
+            download_benefit = describe_daily_limit(
+                settings["premium_daily_limit"]
+            ).lower()
             await message.reply_text(f"✅ Premium added!\n\n👤 User: {user_id}\n📅 Days: {days}\n⏰ Expires: {new_expiry.strftime('%d %B %Y, %I:%M %p')}")
             
             # Notify user
             try:
                 await client.send_message(
                     user_id,
-                    f"🎉 <b>You've been gifted Premium!</b>\n\n📅 <b>Duration:</b> {days} days\n⏰ <b>Valid Until:</b> {new_expiry.strftime('%d %B %Y, %I:%M %p')}\n\n<i>Enjoy unlimited downloads!</i>"
+                    f"🎉 <b>You've been gifted Premium!</b>\n\n📅 <b>Duration:</b> {days} days\n⏰ <b>Valid Until:</b> {new_expiry.strftime('%d %B %Y, %I:%M %p')}\n\n<i>Enjoy {download_benefit}!</i>"
                 )
             except (AttributeError, RPCError, TypeError, ValueError):
                 logger.debug("Optional premium operation failed", exc_info=True)
