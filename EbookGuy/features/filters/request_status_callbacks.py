@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from dataclasses import dataclass
 
 from pyrogram.errors import RPCError, UserIsBlocked
@@ -8,6 +10,7 @@ from info import ADMINS, CHNL_LNK, REQST_CHANNEL, SUPPORT_CHAT_ID
 
 
 ACCESS_DENIED_MESSAGE = "You don't have sufficient rights to do this !"
+logger = logging.getLogger(__name__)
 BLOCKED_USER_NOTE = (
     "\n\nNote: This message is sent to this group because you've blocked the bot. "
     "To send this message to your PM, Must unblock the bot."
@@ -72,6 +75,9 @@ REQUEST_STATUSES = {
 ALERT_STATUSES = {
     status.alert_callback: status for status in REQUEST_STATUSES.values()
 }
+_request_channel_url = None
+_request_channel_lock = asyncio.Lock()
+_notification_tasks = set()
 
 
 def _status_markup(selection):
@@ -93,12 +99,23 @@ def _status_markup(selection):
     return InlineKeyboardMarkup([buttons])
 
 
+async def _request_channel_link(client):
+    global _request_channel_url
+    if _request_channel_url is not None:
+        return _request_channel_url
+    async with _request_channel_lock:
+        if _request_channel_url is not None:
+            return _request_channel_url
+        try:
+            link = await client.create_chat_invite_link(int(REQST_CHANNEL))
+            _request_channel_url = link.invite_link
+        except RPCError:
+            _request_channel_url = CHNL_LNK
+    return _request_channel_url
+
+
 async def _notification_markup(client, query):
-    try:
-        link = await client.create_chat_invite_link(int(REQST_CHANNEL))
-        channel_url = link.invite_link
-    except RPCError:
-        channel_url = CHNL_LNK
+    channel_url = await _request_channel_link(client)
     return InlineKeyboardMarkup(
         [[
             InlineKeyboardButton("Join Channel", url=channel_url),
@@ -127,7 +144,7 @@ async def _notify_requester(client, notification):
         )
 
 
-async def _show_status_options(query, from_user):
+def _status_options_markup(from_user):
     buttons = [
         [
             InlineKeyboardButton(
@@ -147,23 +164,46 @@ async def _show_status_options(query, from_user):
             ),
         ],
     ]
-    await query.message.edit_text(
-        f"<b>{query.message.text}</b>",
-        reply_markup=InlineKeyboardMarkup(buttons),
-    )
-    await query.answer("Here are the options !")
+    return InlineKeyboardMarkup(buttons)
+
+
+async def _edit_status_options(query, from_user):
+    try:
+        await query.message.edit_text(
+            f"<b>{query.message.text}</b>",
+            reply_markup=_status_options_markup(from_user),
+        )
+    except RPCError:
+        logger.exception("Failed to show request status options")
+
+
+async def _apply_status_change(client, query, selection):
+    try:
+        await query.message.edit_text(
+            f"<b><strike>{query.message.text}</strike></b>",
+            reply_markup=_status_markup(selection),
+        )
+        user = await client.get_users(selection.from_user)
+        notification = RequestNotification(
+            query=query,
+            selection=selection,
+            user=user,
+        )
+        await _notify_requester(client, notification)
+    except (RPCError, TypeError, ValueError):
+        logger.exception("Failed to apply request status change")
+
+
+def _retain_task(coroutine):
+    task = asyncio.create_task(coroutine)
+    _notification_tasks.add(task)
+    task.add_done_callback(_notification_tasks.discard)
 
 
 async def _set_request_status(client, query, selection):
-    user = await client.get_users(selection.from_user)
-    await query.message.edit_text(
-        f"<b><strike>{query.message.text}</strike></b>",
-        reply_markup=_status_markup(selection),
-    )
     await query.answer(selection.status.confirmation)
-    await _notify_requester(
-        client,
-        RequestNotification(query=query, selection=selection, user=user),
+    _retain_task(
+        _apply_status_change(client, query, selection)
     )
 
 
@@ -171,9 +211,9 @@ async def _show_requester_alert(client, query, selection):
     if int(query.from_user.id) != int(selection.from_user):
         await query.answer(ACCESS_DENIED_MESSAGE, show_alert=True)
         return
-    user = await client.get_users(selection.from_user)
     await query.answer(
-        f"Hey {user.first_name}, {selection.status.requester_alert}",
+        f"Hey {query.from_user.first_name}, "
+        f"{selection.status.requester_alert}",
         show_alert=True,
     )
 
@@ -188,7 +228,8 @@ async def maybe_handle_request_status_callback(client, query):
             await query.answer(ACCESS_DENIED_MESSAGE, show_alert=True)
             return True
         if action == "show_option":
-            await _show_status_options(query, from_user)
+            await query.answer("Here are the options !")
+            _retain_task(_edit_status_options(query, from_user))
         else:
             await _set_request_status(
                 client,

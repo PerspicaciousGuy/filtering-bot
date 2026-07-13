@@ -1,6 +1,7 @@
 from pyrogram import Client, filters
 
 from info import ADMINS
+from EbookGuy.shared.callback_metrics import measure_callback, measure_command
 from EbookGuy.features.admin.commands import (
     handle_channel_info,
     handle_delete,
@@ -30,21 +31,25 @@ async def start(client, message):
 
 
 @Client.on_callback_query(filters.regex(r"^download_book#"))
+@measure_callback("download_book")
 async def download_book_callback(client, query):
     await handle_download_book_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^convert_menu#"))
+@measure_callback("convert_menu")
 async def convert_menu_callback(client, query):
     await handle_convert_menu_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^do_convert#"))
+@measure_callback("do_convert")
 async def do_convert_callback(client, query):
     await handle_do_convert_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^convert_back#"))
+@measure_callback("convert_back")
 async def convert_back_callback(client, query):
     await handle_convert_back_callback(client, query)
 
@@ -70,11 +75,13 @@ async def delete_all_index(bot, message):
 
 
 @Client.on_callback_query(filters.regex(r'^autofilter_delete'))
+@measure_callback("delete_all_index")
 async def delete_all_index_confirm(bot, query):
     await handle_delete_all_index_confirm(bot, query)
 
 
 @Client.on_message((filters.command(["request", "Request"]) | filters.regex("#request") | filters.regex("#Request")) & filters.private)
+@measure_command("request_book")
 async def requests(bot, message):
     await handle_requests(bot, message)
 

@@ -4,6 +4,7 @@ from pyrogram import Client, filters
 from pyrogram.types import PreCheckoutQuery
 
 from info import ADMINS
+from EbookGuy.shared.callback_metrics import measure_callback
 from EbookGuy.features.premium.admin import (
     handle_add_premium_command,
     handle_premium_users_command,
@@ -40,16 +41,19 @@ async def my_status_command(client, message):
 
 
 @Client.on_callback_query(filters.regex(r"^show_premium$"))
+@measure_callback("show_premium")
 async def show_premium_callback(client, query):
     await handle_show_premium_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^buy_premium_(\d+)$"))
+@measure_callback("buy_premium")
 async def buy_premium_callback(client, query):
     await handle_buy_premium_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^confirm_premium_(\d+)$"))
+@measure_callback("confirm_premium")
 async def confirm_premium_callback(client, query):
     await handle_confirm_premium_callback(client, query)
 

@@ -1,6 +1,7 @@
 from pyrogram import Client, filters
 
 from info import ADMINS
+from EbookGuy.shared.callback_metrics import measure_callback
 from EbookGuy.features.indexing.admin import (
     handle_delete_checkpoint_callback,
     handle_resume_callback,
@@ -12,6 +13,7 @@ from EbookGuy.features.indexing.requests import handle_send_for_index
 
 
 @Client.on_callback_query(filters.regex(r'^index'))
+@measure_callback("index")
 async def index_files(bot, query):
     await handle_index_files(bot, query)
 
@@ -32,11 +34,13 @@ async def resume_indexing(bot, message):
 
 
 @Client.on_callback_query(filters.regex(r'^resume_idx#'))
+@measure_callback("resume_index")
 async def resume_callback(bot, query):
     await handle_resume_callback(bot, query)
 
 
 @Client.on_callback_query(filters.regex(r'^delete_cp#'))
+@measure_callback("delete_checkpoint")
 async def delete_checkpoint_callback(bot, query):
     await handle_delete_checkpoint_callback(bot, query)
 
