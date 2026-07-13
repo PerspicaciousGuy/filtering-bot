@@ -1,5 +1,5 @@
 import jinja2
-from info import *
+from info import LOG_CHANNEL, URL
 from EbookGuy.bot import EbookGuyBot
 from EbookGuy.util.human_readable import humanbytes
 from EbookGuy.util.file_properties import get_file_ids

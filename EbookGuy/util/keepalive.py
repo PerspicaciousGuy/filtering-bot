@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import aiohttp
-from info import *
+from info import PING_INTERVAL, URL
 
 
 async def ping_server():

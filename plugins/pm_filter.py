@@ -3,9 +3,7 @@ from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery
 
 from plugins.pm_filter_callbacks import handle_callback
-from plugins.pm_filter_filtering import global_filters, manual_filters
 from plugins.pm_filter_search import (
-    auto_filter,
     handle_format_selection,
     handle_next_page,
     handle_private_text,
