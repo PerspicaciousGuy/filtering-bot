@@ -1,10 +1,12 @@
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from EbookGuy.features.search.expiry import SearchExpiry, schedule_search_expiry
 from EbookGuy.features.search.results import AutoFilterRequest, auto_filter
 from EbookGuy.features.search.state import MockMessage, PENDING_SEARCH
+from EbookGuy.shared.global_settings import get_global_settings
 
 
-async def show_format_selection(message, query_text):
+async def show_format_selection(message, query_text, settings):
     """Helper function to show format selection buttons"""
     key = f"{message.chat.id}-{message.id}"
     PENDING_SEARCH[key] = {
@@ -18,16 +20,25 @@ async def show_format_selection(message, query_text):
         [InlineKeyboardButton("🎧 Audiobook (MP3, M4B, etc.)", callback_data=f"format_select#audiobook#{key}")],
         [InlineKeyboardButton("📚 All Formats", callback_data=f"format_select#all#{key}")]
     ]
-    await message.reply_text(
+    selection_message = await message.reply_text(
         f"<b>🔍 Searching For:</b> <i>{query_text}</i>\n\n<b>Please select the format you want:</b>",
         reply_markup=InlineKeyboardMarkup(format_btn)
     )
+    schedule_search_expiry(SearchExpiry(
+        key=key,
+        delay_seconds=int(settings["search_result_expiry_seconds"]),
+        messages=(message, selection_message),
+    ))
 
 
 async def handle_private_text(bot, message):
     content = message.text
     if content.startswith("/") or content.startswith("#"): return  # ignore commands and hashtags
-    await show_format_selection(message, content)
+    settings = await get_global_settings()
+    if not settings["search_enabled"]:
+        await message.reply_text("<b>Search is temporarily disabled.</b>")
+        return
+    await show_format_selection(message, content, settings)
 
 
 async def handle_format_selection(bot, query):
