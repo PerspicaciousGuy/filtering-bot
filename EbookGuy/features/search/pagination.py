@@ -3,8 +3,7 @@ from dataclasses import dataclass
 
 from pyrogram.types import InlineKeyboardButton
 
-from info import MAX_B_TN
-from utils import get_size, save_group_settings
+from utils import get_size
 
 
 @dataclass(frozen=True)
@@ -45,13 +44,9 @@ def build_file_buttons(files, prefix):
     ]
 
 
-async def get_page_size(settings, chat_id):
-    try:
-        uses_default_size = settings["max_btn"]
-    except KeyError:
-        await save_group_settings(chat_id, "max_btn", True)
-        uses_default_size = True
-    return 10 if uses_default_size else int(MAX_B_TN)
+def get_page_size(settings):
+    """Return the configured global private-search page size."""
+    return int(settings["results_per_page"])
 
 
 def build_pagination_row(state, is_initial=False):
