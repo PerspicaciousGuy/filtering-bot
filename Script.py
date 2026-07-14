@@ -22,7 +22,7 @@ I can help you find <b>E-Books</b> and <b>Audiobooks</b> in seconds.
 <b>🚀 How to use me:</b>
 Simply type the <b>Book Name</b> or <b>Author Name</b> and I will search my library for you.
 
-🆓 Free users get <b>1 download/day</b>. Use /plan for unlimited access.
+🆓 Free users get <b>{} download(s)/day</b>. Use /plan for higher limits.
 
 <i>👇 Join our channels for updates & support.</i>"""
 
