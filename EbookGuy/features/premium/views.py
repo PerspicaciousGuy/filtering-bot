@@ -9,7 +9,7 @@ from EbookGuy.shared.global_settings import (
     describe_daily_limit,
     get_global_settings,
 )
-from info import PREMIUM_PRICES
+from EbookGuy.features.premium.plans import PLAN_DAYS, get_stars_price
 
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,11 @@ def _premium_status_text(is_premium, expiry, settings):
 def _premium_plan_text(is_premium, expiry, settings):
     status_text = _premium_status_text(is_premium, expiry, settings)
     benefit = describe_daily_limit(settings["premium_daily_limit"])
+    purchase_prompt = (
+        "Select a plan to continue:"
+        if settings["premium_purchases_enabled"]
+        else "Premium purchases are temporarily unavailable."
+    )
     return f"""{status_text}
 <b>\u2b50 Premium Benefits:</b>
 
@@ -72,7 +77,7 @@ def _premium_plan_text(is_premium, expiry, settings):
 
 \U0001f4a1 <i>If you already have a plan, buying again will extend it automatically</i>
 
-<b>Select a plan to continue:</b>"""
+<b>{purchase_prompt}</b>"""
 
 
 def _plan_duration_label(days):
@@ -83,7 +88,7 @@ def _plan_duration_label(days):
     return f"{days} Days"
 
 
-def _premium_plan_markup():
+def _premium_plan_markup(settings):
     buttons = [
         [
             InlineKeyboardButton(
@@ -91,7 +96,9 @@ def _premium_plan_markup():
                 callback_data=f"buy_premium_{days}",
             )
         ]
-        for days, stars in sorted(PREMIUM_PRICES.items())
+        for days in PLAN_DAYS
+        for stars in (get_stars_price(settings, days),)
+        if settings["premium_purchases_enabled"] and stars is not None
     ]
     buttons.append(
         [InlineKeyboardButton("\u274c Close", callback_data="close_data")]
@@ -134,7 +141,7 @@ async def handle_premium_command(client, message):
     settings = await get_global_settings()
     await message.reply_text(
         _premium_plan_text(is_premium, expiry, settings),
-        reply_markup=_premium_plan_markup(),
+        reply_markup=_premium_plan_markup(settings),
         disable_web_page_preview=True,
     )
 
@@ -146,7 +153,7 @@ async def handle_my_status_command(client, message):
     daily_downloads = await db.get_daily_downloads(user_id)
     settings = await get_global_settings()
     reply_markup = None
-    if not (is_premium and expiry):
+    if not (is_premium and expiry) and settings["premium_purchases_enabled"]:
         reply_markup = InlineKeyboardMarkup(
             [[
                 InlineKeyboardButton(
@@ -176,7 +183,7 @@ async def handle_show_premium_callback(client, query):
     try:
         await query.message.edit_text(
             _premium_plan_text(is_premium, expiry, settings),
-            reply_markup=_premium_plan_markup(),
+            reply_markup=_premium_plan_markup(settings),
             disable_web_page_preview=True,
         )
     except MessageNotModified:
