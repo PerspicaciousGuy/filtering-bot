@@ -9,7 +9,6 @@ from database.ia_filterdb import (
     get_bad_files,
     get_file_details,
 )
-from info import AUTH_CHANNEL
 from utils import (
     get_settings,
     is_subscribed,
@@ -117,7 +116,7 @@ async def _handle_delete_link(query):
 
 
 async def _handle_check_subscription(client, query):
-    if AUTH_CHANNEL and not await is_subscribed(client, query):
+    if not await is_subscribed(client, query):
         await query.answer(
             "Join our Back-up channel mahn! \U0001f612",
             show_alert=True,
