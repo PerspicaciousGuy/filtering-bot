@@ -17,14 +17,10 @@ from EbookGuy.bot.clients import initialize_clients
 from EbookGuy.features.premium.expiry_notifications import (
     run_premium_expiry_notifier,
 )
+from EbookGuy.shared.configured_channels import configured_channels
 from EbookGuy.shared.global_settings import get_global_settings
 from EbookGuy.util.keepalive import ping_server
-from info import (
-    AUTH_CHANNEL,
-    CHANNELS,
-    ON_HEROKU,
-    PORT,
-)
+from info import ON_HEROKU, PORT
 from utils import temp
 
 
@@ -103,21 +99,15 @@ async def _send_restart_notifications():
     if log_channel_id:
         await _notify_restart(log_channel_id, restart_text)
 
-    for channel_id in CHANNELS:
-        message = await _notify_restart(
-            channel_id,
-            "**Bot Restarted**",
-        )
-        if message:
-            await message.delete()
-
-    if AUTH_CHANNEL:
-        message = await _notify_restart(
-            AUTH_CHANNEL,
-            "**Bot Restarted**",
-        )
-        if message:
-            await message.delete()
+    notified_channels = {log_channel_id}
+    for setting_key in ("file_channel_ids", "required_subscription_channels"):
+        for channel_id in configured_channels(settings, setting_key):
+            if channel_id in notified_channels:
+                continue
+            notified_channels.add(channel_id)
+            message = await _notify_restart(channel_id, "**Bot Restarted**")
+            if message:
+                await message.delete()
 
 
 async def start():
