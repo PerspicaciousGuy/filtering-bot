@@ -2,6 +2,35 @@ import datetime
 
 
 class PremiumUsageMixin:
+    async def ensure_premium_expiry_index(self):
+        """Create the index used by the premium expiry worker."""
+        await self.col.create_index([
+            ('is_premium', 1),
+            ('premium_expiry', 1),
+        ])
+
+    def get_expiring_premium_users(self, cutoff):
+        """Return active premium users expiring by the supplied cutoff."""
+        now = datetime.datetime.now()
+        return self.col.find(
+            {
+                'is_premium': True,
+                'premium_expiry': {'$gt': now, '$lte': cutoff},
+            },
+            {
+                'id': 1,
+                'premium_expiry': 1,
+                'premium_expiry_notified_for': 1,
+            },
+        )
+
+    async def mark_premium_expiry_notified(self, user_id, expiry):
+        """Record the expiry timestamp for which a warning was sent."""
+        await self.col.update_one(
+            {'id': int(user_id)},
+            {'$set': {'premium_expiry_notified_for': expiry}},
+        )
+
     async def get_premium_status(self, user_id):
         """Get user's premium status and expiry date"""
         user = await self.col.find_one({'id': int(user_id)})
