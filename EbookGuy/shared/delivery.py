@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from pyrogram.errors import PeerIdInvalid, RPCError, UserIsBlocked
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from info import CHNL_LNK, GRP_LNK, OWNER_LNK
+from info import CHNL_LNK, OWNER_LNK
+from EbookGuy.shared.global_settings import get_global_settings
 
 
 @dataclass(frozen=True)
@@ -25,16 +26,20 @@ def _normalize_request(request, legacy_args):
 async def send_all(request, *legacy_args):
     """Send all files directly while preserving the original positional API."""
     request = _normalize_request(request, legacy_args)
+    settings = await get_global_settings()
     try:
         for file in request.files:
             await request.bot.send_cached_media(
                 chat_id=request.user_id,
                 file_id=file["file_id"],
                 caption=file["caption"],
-                protect_content=request.identifier == "filep",
+                protect_content=bool(settings["protect_content"]),
                 reply_markup=InlineKeyboardMarkup(
                     [[
-                        InlineKeyboardButton('Support Group', url=GRP_LNK),
+                        InlineKeyboardButton(
+                            'Support Group',
+                            url=str(settings["support_url"]),
+                        ),
                         InlineKeyboardButton('Updates Channel', url=CHNL_LNK)
                     ],[
                         InlineKeyboardButton("Bot Owner", url=OWNER_LNK)
