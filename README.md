@@ -25,6 +25,7 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 - **Smart search**: Pagination + progressive word-drop fallback for author name queries
 - **Auto-delete**: Configurable delivery deletion policy
 - **Force subscribe**: Require channel membership before access
+- **Trending searches**: `/trending_now` shows configurable recent search trends
 
 ### Premium (Telegram Stars ⭐)
 - Configurable free and premium download limits, cooldowns, and file sizes
@@ -37,6 +38,9 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 - **Broadcast**: Message all users or groups
 - **Duplicate detection**: Find duplicate files in the database
 - **Multi-client support**: Load balance across multiple bot instances
+- **Request workflow**: Require authors and mark requests Processing, Uploaded,
+  Already Available, or Unavailable
+- **Analytics dashboard**: Period-filtered user, search, download, request, conversion, Premium, and Stars metrics inside `/settings`
 
 ### Security & Deployment
 - Docker container runs as non-root user
@@ -54,9 +58,13 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 ### Runtime Settings
 
 Bot administrators can use `/settings` in a private chat to manage Usage,
-Search, Delivery, Requests, Premium, and Bot Operation values. Overrides are
-stored in MongoDB, audited, cached briefly, and applied without a restart.
-Values in `info.py` remain the defaults used when no override is stored.
+Access & Welcome, Channels, Search, Delivery, Requests, Premium, and Bot
+Operation values. File indexing, file deletion, request, index-request, log,
+and support fallback channels can be changed and validated without restarting.
+The dashboard also provides analytics and a confirmed action for resetting all
+current daily download counters. Overrides are stored in MongoDB, audited,
+cached briefly, and applied without a restart. Values in `info.py` remain the
+defaults used when no override is stored.
 
 ### Code Organization
 
@@ -107,6 +115,8 @@ docker run -d -p 8080:8080 --env-file .env ebookguy-bot
 | `/mystatus` | Check premium status and remaining downloads |
 | `/id` | Get your Telegram ID |
 | `/info` | Get user info |
+| `/request Book title \| Author name` | Submit a book request |
+| `/trending_now` | Show recent trending searches |
 
 ### Admin
 | Command | Description |
