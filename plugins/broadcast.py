@@ -7,12 +7,17 @@ from pymongo.errors import PyMongoError
 from pyrogram import Client, filters
 from database.users_chats_db import db
 from info import ADMINS
+from EbookGuy.shared.global_settings import get_global_settings
 from utils import broadcast_messages
 
 logger = logging.getLogger(__name__)
         
 @Client.on_message(filters.command("broadcast") & filters.user(ADMINS))
 async def pm_broadcast(bot, message):
+    settings = await get_global_settings()
+    if not settings["broadcasts_enabled"]:
+        await message.reply_text("Broadcasts are temporarily disabled.")
+        return
     b_msg = await bot.ask(chat_id = message.from_user.id, text = "Now Send Me Your Broadcast Message")
     try:
         users = await db.get_all_users()
