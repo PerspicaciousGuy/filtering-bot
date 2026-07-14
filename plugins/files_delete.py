@@ -1,5 +1,3 @@
-import logging
-
 from pyrogram import Client, filters
 
 from EbookGuy.features.admin.file_cleanup import (
@@ -7,23 +5,15 @@ from EbookGuy.features.admin.file_cleanup import (
     handle_delete_media,
     handle_find_duplicates,
 )
-from info import ADMINS, DELETE_CHANNELS
+from info import ADMINS
 from EbookGuy.shared.callback_metrics import measure_callback
+from EbookGuy.shared.configured_channels import configured_channel_filter
 
 
-logger = logging.getLogger(__name__)
 media_filter = filters.document | filters.video | filters.audio
 
-if not DELETE_CHANNELS or DELETE_CHANNELS == [""]:
-    logger.warning("Delete channels are empty; file deletion is disabled")
-else:
-    logger.info(
-        "File deletion handler enabled for %s channel(s)",
-        len(DELETE_CHANNELS),
-    )
 
-
-@Client.on_message(filters.chat(DELETE_CHANNELS) & media_filter)
+@Client.on_message(media_filter & configured_channel_filter("delete_channel_ids"))
 async def deletemultiplemedia(bot, message):
     await handle_delete_media(bot, message)
 
