@@ -20,11 +20,16 @@ from EbookGuy.features.downloads.conversion import (
     handle_convert_menu_callback,
     handle_do_convert_callback,
 )
+from EbookGuy.features.downloads.force_subscription import (
+    enforce_callback_subscription,
+    enforce_subscription,
+)
 from plugins.commands_downloads import (
     handle_download_book_callback,
     handle_start,
 )
 from EbookGuy.features.requests.commands import handle_requests
+from EbookGuy.features.search.trending import handle_trending_command
 
 
 @Client.on_message(filters.command("start") & filters.incoming & filters.private)
@@ -35,24 +40,32 @@ async def start(client, message):
 @Client.on_callback_query(filters.regex(r"^download_book#"))
 @measure_callback("download_book")
 async def download_book_callback(client, query):
+    if await enforce_callback_subscription(client, query):
+        return
     await handle_download_book_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^convert_menu#"))
 @measure_callback("convert_menu")
 async def convert_menu_callback(client, query):
+    if await enforce_callback_subscription(client, query):
+        return
     await handle_convert_menu_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^do_convert#"))
 @measure_callback("do_convert")
 async def do_convert_callback(client, query):
+    if await enforce_callback_subscription(client, query):
+        return
     await handle_do_convert_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^convert_back#"))
 @measure_callback("convert_back")
 async def convert_back_callback(client, query):
+    if await enforce_callback_subscription(client, query):
+        return
     await handle_convert_back_callback(client, query)
 
 
@@ -73,6 +86,12 @@ async def settings_command(client, message):
 @measure_callback("global_settings")
 async def settings_callback(client, query):
     await handle_settings_callback(client, query)
+
+
+@Client.on_message(filters.command("trending_now") & filters.private)
+@measure_command("trending_now")
+async def trending_now(client, message):
+    await handle_trending_command(client, message)
 
 
 @Client.on_message(filters.command('logs') & filters.user(ADMINS))
@@ -99,6 +118,8 @@ async def delete_all_index_confirm(bot, query):
 @Client.on_message((filters.command(["request", "Request"]) | filters.regex("#request") | filters.regex("#Request")) & filters.private)
 @measure_command("request_book")
 async def requests(bot, message):
+    if await enforce_subscription(bot, message):
+        return
     await handle_requests(bot, message)
 
 

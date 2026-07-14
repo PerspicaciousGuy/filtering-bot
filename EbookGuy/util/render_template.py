@@ -1,6 +1,7 @@
 import jinja2
-from info import LOG_CHANNEL, URL
+from info import URL
 from EbookGuy.bot import EbookGuyBot
+from EbookGuy.shared.global_settings import get_global_settings
 from EbookGuy.util.human_readable import humanbytes
 from EbookGuy.util.file_properties import get_file_ids
 from EbookGuy.server.exceptions import InvalidHash
@@ -10,7 +11,9 @@ import aiohttp
 
 
 async def render_page(id, secure_hash, src=None):
-    file_data = await get_file_ids(EbookGuyBot, int(LOG_CHANNEL), int(id))
+    settings = await get_global_settings()
+    log_channel_id = int(settings["log_channel_id"])
+    file_data = await get_file_ids(EbookGuyBot, log_channel_id, int(id))
     if file_data.unique_id[:6] != secure_hash:
         logging.debug(f"link hash: {secure_hash} - {file_data.unique_id[:6]}")
         logging.debug(f"Invalid hash for message with - ID {id}")
