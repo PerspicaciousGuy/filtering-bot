@@ -3,8 +3,8 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Union
 
-from info import LOG_CHANNEL
 from EbookGuy.bot import work_loads
+from EbookGuy.shared.global_settings import get_global_settings
 from pyrogram import Client, utils, raw
 from EbookGuy.util.file_properties import get_file_ids
 from pyrogram.session import Session, Auth
@@ -108,7 +108,9 @@ class ByteStreamer:
         Generates the properties of a media file on a specific message.
         returns ths properties in a FIleId class.
         """
-        file_id = await get_file_ids(self.client, LOG_CHANNEL, id)
+        settings = await get_global_settings()
+        log_channel_id = int(settings["log_channel_id"])
+        file_id = await get_file_ids(self.client, log_channel_id, id)
         logging.debug(f"Generated file ID and Unique ID for message with ID {id}")
         if not file_id:
             logging.debug(f"Message with ID {id} not found")
