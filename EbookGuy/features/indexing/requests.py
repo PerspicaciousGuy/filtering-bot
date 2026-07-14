@@ -13,6 +13,7 @@ from pyrogram.errors.exceptions.bad_request_400 import (
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.indexing_checkpoints import get_checkpoint
+from EbookGuy.shared.global_settings import get_global_settings
 from info import ADMINS, FILTER_BY_EXTENSION
 from info import INDEX_REQ_CHANNEL as LOG_CHANNEL
 
@@ -191,6 +192,10 @@ async def _submit_index_request(bot, message, target):
 
 
 async def handle_send_for_index(bot, message):
+    settings = await get_global_settings()
+    if not settings["indexing_enabled"]:
+        await message.reply("Indexing is temporarily disabled.")
+        return
     response = await bot.ask(
         message.chat.id,
         "**\U0001f4e5 Send me your channel's last post link or "
