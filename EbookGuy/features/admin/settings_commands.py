@@ -144,10 +144,6 @@ def build_setting_detail(
         f"<b>Current:</b> <code>{current_value}</code>",
         f"<b>Default:</b> <code>{default_value}</code>",
     ]
-    if not is_editable_setting(key):
-        lines.extend(
-            ["", "<i>Editing will be available when this category is active.</i>"]
-        )
     markup = InlineKeyboardMarkup(_setting_action_rows(key, category))
     return "\n".join(lines), markup
 
