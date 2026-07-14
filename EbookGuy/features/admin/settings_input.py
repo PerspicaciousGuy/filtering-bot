@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
+from html import escape
 
 from pyrogram import filters
 from pyrogram.errors import ListenerTimeout, RPCError
@@ -77,16 +78,18 @@ async def _finish_input(prompt, reply, text: str) -> None:
     _retain_input_task(_delete_confirmation(confirmation))
 
 
-async def _apply_input(reply, prompt, context: SettingsInput) -> None:
+async def _apply_input(reply, prompt, context: SettingsInput) -> bool:
     raw_value = (reply.text or "").strip()
     if raw_value.lower() == "/cancel":
         await _finish_input(prompt, reply, "Settings update cancelled.")
-        return
+        return True
     try:
         value = validate_setting_value(context.key, raw_value)
     except (KeyError, ValueError) as error:
-        await reply.reply_text(str(error))
-        return
+        notice = await reply.reply_text(escape(str(error)))
+        await _delete_messages((reply,))
+        _retain_input_task(_delete_confirmation(notice))
+        return False
     previous = await save_global_setting(
         context.key,
         value,
@@ -97,8 +100,10 @@ async def _apply_input(reply, prompt, context: SettingsInput) -> None:
         prompt,
         reply,
         f"Updated <b>{SETTING_LABELS[context.key]}</b>: "
-        f"<code>{previous}</code> -> <code>{value}</code>",
+        f"<code>{escape(str(previous))}</code> -> "
+        f"<code>{escape(str(value))}</code>",
     )
+    return True
 
 
 async def _collect_input(client, context: SettingsInput) -> None:
@@ -108,13 +113,15 @@ async def _collect_input(client, context: SettingsInput) -> None:
             context.chat_id,
             _input_prompt(context),
         )
-        reply = await client.listen(
-            filters=filters.text & filters.user(context.admin_id),
-            timeout=INPUT_TIMEOUT_SECONDS,
-            chat_id=context.chat_id,
-            user_id=context.admin_id,
-        )
-        await _apply_input(reply, prompt, context)
+        is_complete = False
+        while not is_complete:
+            reply = await client.listen(
+                filters=filters.text & filters.user(context.admin_id),
+                timeout=INPUT_TIMEOUT_SECONDS,
+                chat_id=context.chat_id,
+                user_id=context.admin_id,
+            )
+            is_complete = await _apply_input(reply, prompt, context)
     except ListenerTimeout:
         if prompt is not None:
             await _delete_messages((prompt,))
