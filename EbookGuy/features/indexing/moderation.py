@@ -3,6 +3,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from info import ADMINS
 from EbookGuy.features.indexing.models import IndexRequest
 from EbookGuy.features.indexing.worker import index_files_to_db, lock
+from EbookGuy.shared.global_settings import get_global_settings
 from utils import temp
 
 async def handle_index_files(bot, query):
@@ -17,6 +18,11 @@ async def handle_index_files(bot, query):
             f'Your Submission for indexing {chat} has been declined by our moderators.',
             reply_to_message_id=int(lst_msg_id)
         )
+        return
+
+    settings = await get_global_settings()
+    if not settings["indexing_enabled"]:
+        await query.answer("Indexing is temporarily disabled.", show_alert=True)
         return
 
     if lock.locked():
