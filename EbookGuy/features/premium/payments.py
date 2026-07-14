@@ -14,6 +14,7 @@ from EbookGuy.shared.global_settings import (
     describe_daily_limit,
     get_global_settings,
 )
+from EbookGuy.shared.analytics import track_event
 from EbookGuy.features.premium.plans import (
     PLAN_DAYS,
     get_inr_price,
@@ -34,6 +35,16 @@ class PremiumInvoice:
     days: int
     stars: int
     download_benefit: str
+
+
+def _track_payment_success(user_id, payment, days):
+    track_event(
+        "payment.completed",
+        user_id,
+        days=days,
+        stars=int(payment.total_amount),
+        currency=str(payment.currency),
+    )
 
 
 async def _clear_previous_invoice(client, query, user_id):
@@ -209,6 +220,7 @@ async def handle_successful_payment_handler(client, message):
             new_expiry = await db.set_premium(user_id, days)
             
             if new_expiry:
+                _track_payment_success(user_id, payment, days)
                 settings = await get_global_settings()
                 download_benefit = describe_daily_limit(
                     settings["premium_daily_limit"]
