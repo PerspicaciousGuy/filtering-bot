@@ -6,7 +6,7 @@ from EbookGuy.features.downloads.start_views import (
     get_start_buttons,
     show_start_message,
 )
-from info import LOG_CHANNEL
+from EbookGuy.shared.global_settings import get_global_settings
 
 
 WELCOME_PAYLOADS = {"subscribe", "error", "okay", "help"}
@@ -17,8 +17,12 @@ async def _register_user(client, message):
     if await db.is_user_exist(user.id):
         return
     await db.add_user(user.id, user.first_name)
+    settings = await get_global_settings()
+    log_channel_id = int(settings["log_channel_id"])
+    if not log_channel_id:
+        return
     await client.send_message(
-        LOG_CHANNEL,
+        log_channel_id,
         script.LOG_TEXT_P.format(user.id, user.mention),
     )
 
