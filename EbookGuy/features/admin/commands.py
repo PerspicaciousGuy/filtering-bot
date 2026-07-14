@@ -7,21 +7,24 @@ from pyrogram import enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.ia_filterdb import col, delete_file_record, sec_col, unpack_new_file_id, get_bad_files
 from database.users_chats_db import db
-from info import CHANNELS
+from EbookGuy.shared.configured_channels import configured_channels
+from EbookGuy.shared.global_settings import get_global_settings
 from utils import get_size
 
 logger = logging.getLogger(__name__)
 
 async def handle_channel_info(bot, message):
     text = '📑 **Indexed channels/groups**\n'
-    for channel in CHANNELS:
+    settings = await get_global_settings()
+    channels = configured_channels(settings, "file_channel_ids")
+    for channel in channels:
         chat = await bot.get_chat(channel)
         if chat.username:
             text += '\n@' + chat.username
         else:
             text += '\n' + chat.title or chat.first_name
 
-    text += f'\n\n**Total:** {len(CHANNELS)}'
+    text += f'\n\n**Total:** {len(channels)}'
 
     if len(text) < 4096:
         await message.reply(text)
