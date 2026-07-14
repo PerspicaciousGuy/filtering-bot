@@ -2,7 +2,8 @@ import logging
 
 from pyrogram import enums
 
-from info import CUSTOM_FILE_CAPTION, MAX_LIST_ELM
+from info import MAX_LIST_ELM
+from EbookGuy.shared.global_settings import get_cached_global_setting
 from EbookGuy.shared.state import temp
 
 logger = logging.getLogger(__name__)
@@ -20,10 +21,11 @@ def get_size(size):
 
 def format_file_caption(file_name, file_size, file_caption=None):
     """Apply the configured file-caption template to normalized metadata."""
-    if not CUSTOM_FILE_CAPTION:
+    caption_template = get_cached_global_setting("custom_file_caption")
+    if not caption_template:
         return file_caption
     try:
-        return CUSTOM_FILE_CAPTION.format(
+        return str(caption_template).format(
             file_name=file_name or "",
             file_size=file_size or "",
             file_caption=file_caption or "",
