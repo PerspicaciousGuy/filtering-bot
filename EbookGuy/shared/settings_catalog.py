@@ -10,7 +10,7 @@ CATEGORY_LABELS = {
     "operations": "Bot Operation",
 }
 
-EDITABLE_CATEGORIES = {"usage", "search"}
+EDITABLE_CATEGORIES = set(CATEGORY_LABELS)
 
 SETTING_LABELS = {
     "free_daily_limit": "Free downloads per day",
