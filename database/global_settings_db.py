@@ -5,9 +5,18 @@ from EbookGuy.shared.settings_schema import (
     is_known_setting,
     normalize_stored_setting,
 )
+from EbookGuy.shared.settings_defaults import LEGACY_GLOBAL_SETTING_ALIASES
 
 
 GLOBAL_SETTINGS_ID = "bot"
+
+
+def _legacy_setting_values(stored: dict[str, object]) -> dict[str, object]:
+    values = {}
+    for key, legacy_key in LEGACY_GLOBAL_SETTING_ALIASES.items():
+        if key not in stored and legacy_key in stored:
+            values[key] = normalize_stored_setting(key, stored[legacy_key])
+    return values
 
 
 class GlobalSettingsMixin:
@@ -25,7 +34,8 @@ class GlobalSettingsMixin:
             for key, value in stored.items()
             if is_known_setting(key)
         }
-        return {**DEFAULT_GLOBAL_SETTINGS, **known_values}
+        legacy_values = _legacy_setting_values(stored)
+        return {**DEFAULT_GLOBAL_SETTINGS, **legacy_values, **known_values}
 
     async def update_global_setting(self, key: str, value: object) -> None:
         """Persist one known global setting."""
@@ -41,9 +51,13 @@ class GlobalSettingsMixin:
         """Remove one stored override so its configured default applies."""
         if not is_known_setting(key):
             raise KeyError(f"Unknown global setting: {key}")
+        unset_values = {f"values.{key}": ""}
+        legacy_key = LEGACY_GLOBAL_SETTING_ALIASES.get(key)
+        if legacy_key:
+            unset_values[f"values.{legacy_key}"] = ""
         await self.global_settings.update_one(
             {"_id": GLOBAL_SETTINGS_ID},
-            {"$unset": {f"values.{key}": ""}},
+            {"$unset": unset_values},
         )
 
     async def record_global_setting_change(self, entry: dict[str, object]) -> None:
