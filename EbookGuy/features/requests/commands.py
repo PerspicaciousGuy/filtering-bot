@@ -4,10 +4,12 @@ import logging
 from dataclasses import dataclass
 from html import escape
 
+from bson import ObjectId
 from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.users_chats_db import db
+from EbookGuy.shared.analytics import track_event
 from EbookGuy.shared.global_settings import get_global_settings
 from info import ADMINS, CHNL_LNK
 
@@ -20,6 +22,10 @@ REQUEST_MARKERS = ("#request", "/request", "#Request", "/Request")
 EMPTY_REQUEST_MESSAGE = (
     "<b>You must type about your request [Minimum 3 Characters]. "
     "Requests can't be empty.</b>"
+)
+AUTHOR_REQUIRED_MESSAGE = (
+    "Include the author using this format:\n"
+    "<code>/request Book title | Author name</code>"
 )
 FORWARD_ERROR_MESSAGE = (
     "Something went wrong while sending your request. Please try again later."
@@ -40,6 +46,9 @@ class RequestSubmission:
     content: str
     normalized_content: str
     settings: dict[str, object]
+    request_id: ObjectId
+    title: str
+    author: str
 
 
 def _extract_request_content(message):
@@ -53,18 +62,20 @@ def _extract_request_content(message):
     return content.strip()
 
 
-def _moderation_markup(reporter_id):
+def _moderation_markup(request_id, reporter_id):
+    token = f"{request_id}:{reporter_id}"
     return InlineKeyboardMarkup(
         [[
             InlineKeyboardButton(
                 "Show Options",
-                callback_data=f"show_option#{reporter_id}",
+                callback_data=f"show_option#{token}",
             )
         ]]
     )
 
 
-def _request_text(message, content, includes_reporter_id):
+def _request_text(submission, includes_reporter_id):
+    message = submission.message
     reporter_name = escape(message.from_user.first_name or "Unknown")
     if includes_reporter_id:
         reporter = f"{reporter_name} ({message.from_user.id})"
@@ -72,19 +83,21 @@ def _request_text(message, content, includes_reporter_id):
         reporter = reporter_name
     return (
         f"<b>Reporter :</b> <code>{reporter}</code>\n\n"
-        f"<b>Message :</b> <code>{escape(content)}</code>"
+        f"<b>Request ID:</b> <code>{submission.request_id}</code>\n"
+        f"<b>Book:</b> <code>{escape(submission.title)}</code>\n"
+        f"<b>Author:</b> <code>{escape(submission.author)}</code>"
     )
 
 
 async def _forward_request(submission):
     message = submission.message
     reporter_id = str(message.from_user.id)
-    reply_markup = _moderation_markup(reporter_id)
+    reply_markup = _moderation_markup(submission.request_id, reporter_id)
     channel_id = int(submission.settings["request_channel_id"])
     if channel_id:
         return await submission.bot.send_message(
             chat_id=channel_id,
-            text=_request_text(message, submission.content, False),
+            text=_request_text(submission, False),
             reply_markup=reply_markup,
         )
 
@@ -92,7 +105,7 @@ async def _forward_request(submission):
     for admin_id in ADMINS:
         reported_post = await submission.bot.send_message(
             chat_id=admin_id,
-            text=_request_text(message, submission.content, True),
+            text=_request_text(submission, True),
             reply_markup=reply_markup,
         )
     return reported_post
@@ -135,6 +148,17 @@ def _normalize_request(content):
     return " ".join(content.casefold().split())
 
 
+def _parse_request_content(content, is_author_required):
+    title, separator, author = content.partition("|")
+    title = title.strip()
+    author = author.strip()
+    if len(title) < MINIMUM_REQUEST_LENGTH:
+        raise ValueError(EMPTY_REQUEST_MESSAGE)
+    if is_author_required and (not separator or len(author) < 2):
+        raise ValueError(AUTHOR_REQUIRED_MESSAGE)
+    return title, author or "Not provided"
+
+
 async def _request_denial(submission):
     settings = submission.settings
     if not settings["requests_enabled"]:
@@ -160,14 +184,21 @@ async def _request_denial(submission):
     return None
 
 
-def _request_record(submission):
+def _request_record(submission, reported_post):
     submitted_at = _utc_now()
     return {
+        "_id": submission.request_id,
         "user_id": int(submission.message.from_user.id),
         "content": submission.content,
+        "title": submission.title,
+        "author": submission.author,
         "normalized_content": submission.normalized_content,
         "request_date": submitted_at.date().isoformat(),
         "submitted_at": submitted_at,
+        "status": "pending",
+        "destination_chat_id": int(reported_post.chat.id),
+        "destination_message_id": int(reported_post.id),
+        "destination_link": reported_post.link,
     }
 
 
@@ -187,7 +218,12 @@ async def _submit_request(submission):
             logger.error("No request destination is configured")
             await submission.message.reply_text(FORWARD_ERROR_MESSAGE)
             return
-        await db.record_request(_request_record(submission))
+        await db.record_request(_request_record(submission, reported_post))
+        track_event(
+            "request.submitted",
+            submission.message.from_user.id,
+            request_id=str(submission.request_id),
+        )
     try:
         await _confirm_request(submission, reported_post)
     except RPCError:
@@ -212,12 +248,24 @@ async def handle_requests(bot, message):
             f"Keep the request under {MAXIMUM_REQUEST_LENGTH} characters."
         )
         return
+    try:
+        title, author = _parse_request_content(
+            content,
+            bool(settings["request_author_required"]),
+        )
+    except ValueError as error:
+        await message.reply_text(str(error))
+        return
     await db.ensure_request_indexes()
+    request_id = ObjectId()
     submission = RequestSubmission(
         bot=bot,
         message=message,
         content=content,
-        normalized_content=_normalize_request(content),
+        normalized_content=_normalize_request(f"{title} | {author}"),
         settings=settings,
+        request_id=request_id,
+        title=title,
+        author=author,
     )
     await _submit_request(submission)
