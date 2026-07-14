@@ -15,7 +15,6 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.indexing_checkpoints import get_checkpoint
 from EbookGuy.shared.global_settings import get_global_settings
 from info import ADMINS, FILTER_BY_EXTENSION
-from info import INDEX_REQ_CHANNEL as LOG_CHANNEL
 
 
 logger = logging.getLogger(__name__)
@@ -139,22 +138,7 @@ async def _show_admin_index_prompt(message, target):
     )
 
 
-async def _submit_index_request(bot, message, target):
-    if isinstance(target.chat_id, int):
-        try:
-            invite = await bot.create_chat_invite_link(
-                target.chat_id
-            )
-        except ChatAdminRequired:
-            await message.reply(
-                "Make sure I am an admin in the chat and have "
-                "permission to invite users."
-            )
-            return
-        invite_link = invite.invite_link
-    else:
-        invite_link = f"@{target.chat_id}"
-
+def _index_request_markup(target, message):
     buttons = [
         [
             InlineKeyboardButton(
@@ -175,15 +159,38 @@ async def _submit_index_request(bot, message, target):
             )
         ],
     ]
+    return InlineKeyboardMarkup(buttons)
+
+
+async def _submit_index_request(bot, message, target):
+    settings = await get_global_settings()
+    channel_id = int(settings["index_request_channel_id"])
+    channel_id = channel_id or int(settings["log_channel_id"])
+    if not channel_id:
+        await message.reply("Index requests are temporarily unavailable.")
+        return
+    if isinstance(target.chat_id, int):
+        try:
+            invite = await bot.create_chat_invite_link(target.chat_id)
+        except ChatAdminRequired:
+            await message.reply(
+                "Make sure I am an admin in the chat and have "
+                "permission to invite users."
+            )
+            return
+        invite_link = invite.invite_link
+    else:
+        invite_link = f"@{target.chat_id}"
+
     await bot.send_message(
-        LOG_CHANNEL,
+        channel_id,
         "#IndexRequest\n\n"
         f"By : {message.from_user.mention} "
         f"(\x60{message.from_user.id}\x60)\n"
         f"Chat ID/Username: \x60{target.chat_id}\x60\n"
         f"Last Message ID: \x60{target.last_message_id}\x60\n"
         f"InviteLink: {invite_link}",
-        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_markup=_index_request_markup(target, message),
     )
     await message.reply(
         "Thank you for the contribution! Wait for our moderators "
