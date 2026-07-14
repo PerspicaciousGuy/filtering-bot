@@ -12,6 +12,11 @@ from EbookGuy.features.admin.settings_commands import (
     build_settings_dashboard,
 )
 from EbookGuy.features.admin.settings_input import start_setting_input
+from EbookGuy.features.admin.settings_actions import (
+    reset_download_limits,
+    show_download_reset_confirmation,
+)
+from EbookGuy.features.admin.analytics import show_analytics
 from EbookGuy.shared.global_settings import (
     get_global_settings,
     reset_global_setting,
@@ -101,6 +106,17 @@ async def _route_settings_callback(client, query) -> None:
         await _reset_setting(query, data.rsplit(":", 1)[-1])
     elif data.startswith("global_settings:edit:"):
         await start_setting_input(client, query, data.rsplit(":", 1)[-1])
+    elif data == "global_settings:action:reset_downloads":
+        await show_download_reset_confirmation(query)
+    elif data == "global_settings:confirm:reset_downloads":
+        await reset_download_limits(query)
+    elif data.startswith("global_settings:analytics:"):
+        payload = data.removeprefix("global_settings:analytics:")
+        parts = payload.split(":")
+        if len(parts) != 2:
+            await query.answer("Unknown analytics view.", show_alert=True)
+        else:
+            await show_analytics(query, parts[0], parts[1])
     elif data == "global_settings:home":
         await query.answer()
         text, markup = build_settings_dashboard()

@@ -32,7 +32,10 @@ def _display_value(value: object) -> str:
         return "Enabled" if value else "Disabled"
     if value == 0:
         return "Unlimited / not set"
-    text = str(value).replace("\n", " ")
+    if isinstance(value, (list, tuple)):
+        text = ", ".join(str(item) for item in value) or "None"
+    else:
+        text = str(value).replace("\n", " ")
     if len(text) > MAX_DISPLAY_LENGTH:
         text = f"{text[:MAX_DISPLAY_LENGTH]}..."
     return escape(text)
@@ -49,6 +52,14 @@ def build_settings_dashboard() -> tuple[str, InlineKeyboardMarkup]:
         ]
         for key, label in CATEGORY_LABELS.items()
     ]
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                "Analytics",
+                callback_data="global_settings:analytics:overview:7d",
+            )
+        ]
+    )
     buttons.append(
         [InlineKeyboardButton("Close", callback_data=f"{CALLBACK_PREFIX}:close")]
     )
@@ -71,6 +82,15 @@ def build_category_view(category: str) -> tuple[str, InlineKeyboardMarkup]:
         ]
         for key in CATEGORY_SETTINGS[category]
     ]
+    if category == "usage":
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    "Reset Today's Download Limits",
+                    callback_data=f"{CALLBACK_PREFIX}:action:reset_downloads",
+                )
+            ]
+        )
     rows.append(
         [
             InlineKeyboardButton(

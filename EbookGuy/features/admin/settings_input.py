@@ -10,6 +10,9 @@ from pyrogram.errors import ListenerTimeout, RPCError
 from pymongo.errors import PyMongoError
 
 from EbookGuy.features.admin.settings_commands import build_setting_detail
+from EbookGuy.features.admin.settings_runtime_validation import (
+    validate_runtime_setting,
+)
 from EbookGuy.shared.global_settings import (
     get_global_settings,
     save_global_setting,
@@ -38,6 +41,7 @@ class SettingsInput:
     chat_id: int
     message: object
     key: str
+    client: object
 
 
 def is_settings_input_active(user_id: int) -> bool:
@@ -85,6 +89,7 @@ async def _apply_input(reply, prompt, context: SettingsInput) -> bool:
         return True
     try:
         value = validate_setting_value(context.key, raw_value)
+        await validate_runtime_setting(context.client, context.key, value)
     except (KeyError, ValueError) as error:
         notice = await reply.reply_text(escape(str(error)))
         await _delete_messages((reply,))
@@ -162,6 +167,7 @@ async def start_setting_input(client, query, key: str) -> None:
         chat_id=query.message.chat.id,
         message=query.message,
         key=key,
+        client=client,
     )
     await query.answer("Send the new value in this chat.")
     _active_admins.add(admin_id)
