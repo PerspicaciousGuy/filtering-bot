@@ -1,30 +1,107 @@
 import logging
+from dataclasses import dataclass
 
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, LabeledPrice
 from pyrogram.errors import MessageNotModified, RPCError
+from pyrogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    LabeledPrice,
+    PreCheckoutQuery,
+)
 from pymongo.errors import PyMongoError
 from database.users_chats_db import db
 from EbookGuy.shared.global_settings import (
     describe_daily_limit,
     get_global_settings,
 )
-from info import PREMIUM_PRICES, PREMIUM_PRICES_INR, PAYMENT_WEBSITE
+from EbookGuy.features.premium.plans import (
+    PLAN_DAYS,
+    get_inr_price,
+    get_stars_price,
+)
+from info import PAYMENT_WEBSITE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 last_invoice_messages = {}
 
+
+@dataclass(frozen=True)
+class PremiumInvoice:
+    """Validated data needed to issue one Telegram Stars invoice."""
+
+    user_id: int
+    days: int
+    stars: int
+    download_benefit: str
+
+
+async def _clear_previous_invoice(client, query, user_id):
+    if user_id in last_invoice_messages:
+        try:
+            await client.delete_messages(user_id, last_invoice_messages[user_id])
+        except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
+            logger.debug("Previous invoice was already unavailable", exc_info=True)
+    try:
+        await query.message.delete()
+    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
+        logger.debug("Payment confirmation was already unavailable", exc_info=True)
+
+
+async def _send_premium_invoice(client, invoice):
+    return await client.send_invoice(
+        chat_id=invoice.user_id,
+        title=f"Premium - {invoice.days} Days",
+        description=(
+            f"Get {invoice.days} days of Premium access with "
+            f"{invoice.download_benefit}. Existing Premium is extended."
+        ),
+        payload=f"premium_{invoice.days}_{invoice.user_id}",
+        currency="XTR",
+        prices=[LabeledPrice(
+            label=f"{invoice.days} Days Premium",
+            amount=invoice.stars,
+        )],
+    )
+
+
+def _payment_method_buttons(days, settings):
+    buttons = [
+        [InlineKeyboardButton(
+            "⭐ Pay with Telegram Stars",
+            callback_data=f"confirm_premium_{days}",
+        )],
+        [InlineKeyboardButton("💳 Go to Payment Portal", url=PAYMENT_WEBSITE)],
+        [InlineKeyboardButton("« Back to Plans", callback_data="show_premium")],
+    ]
+    if not settings["stars_payments_enabled"]:
+        buttons.pop(0)
+    return buttons
+
+
 async def handle_buy_premium_callback(client, query):
     """Handle premium purchase button click - show payment method options"""
     days = int(query.data.split("_")[2])
-    stars = PREMIUM_PRICES.get(days)
+    settings = await get_global_settings()
+    if not settings["premium_purchases_enabled"]:
+        await query.answer(
+            "Premium purchases are temporarily disabled.",
+            show_alert=True,
+        )
+        return
+    stars = get_stars_price(settings, days)
     
     if not stars:
         return await query.answer("Invalid plan!", show_alert=True)
     
     # Get INR price if available
-    inr_price = PREMIUM_PRICES_INR.get(days, "")
+    inr_price = get_inr_price(settings, days)
     plan_name = f"{days} Day" if days == 7 else f"{days} Day{'s' if days > 1 else ''}"
+    stars_method = (
+        "⭐ <b>Telegram Stars</b> - Instant payment within the bot"
+        if settings["stars_payments_enabled"]
+        else "Telegram Stars payments are temporarily unavailable."
+    )
     
     text = f"""
 <b>💳 Complete Your Payment</b>
@@ -35,16 +112,11 @@ async def handle_buy_premium_callback(client, query):
 
 <b>Choose your preferred payment method:</b>
 
-⭐ <b>Telegram Stars</b> - Instant payment within the bot
+{stars_method}
 💳 <b>Other Methods</b> - UPI, Crypto, Binance Pay on our portal
 """
     
-    buttons = [
-        [InlineKeyboardButton(f"⭐ Pay with Telegram Stars", callback_data=f"confirm_premium_{days}")],
-        [InlineKeyboardButton("💳 Go to Payment Portal", url=PAYMENT_WEBSITE)],
-        [InlineKeyboardButton("« Back to Plans", callback_data="show_premium")]
-    ]
-    
+    buttons = _payment_method_buttons(days, settings)
     try:
         await query.message.edit_text(
             text,
@@ -57,9 +129,21 @@ async def handle_buy_premium_callback(client, query):
 async def handle_confirm_premium_callback(client, query):
     """Handle confirmed premium purchase - send Telegram Stars invoice"""
     days = int(query.data.split("_")[2])
-    stars = PREMIUM_PRICES.get(days)
-    user_id = query.from_user.id
     settings = await get_global_settings()
+    if not settings["premium_purchases_enabled"]:
+        await query.answer(
+            "Premium purchases are temporarily disabled.",
+            show_alert=True,
+        )
+        return
+    if not settings["stars_payments_enabled"]:
+        await query.answer(
+            "Telegram Stars payments are disabled.",
+            show_alert=True,
+        )
+        return
+    stars = get_stars_price(settings, days)
+    user_id = query.from_user.id
     download_benefit = describe_daily_limit(
         settings["premium_daily_limit"]
     ).lower()
@@ -67,33 +151,10 @@ async def handle_confirm_premium_callback(client, query):
     if not stars:
         return await query.answer("Invalid plan!", show_alert=True)
     
-    # Delete previous invoice message if exists
-    if user_id in last_invoice_messages:
-        try:
-            await client.delete_messages(user_id, last_invoice_messages[user_id])
-        except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
-            logger.debug("Previous invoice message was already unavailable", exc_info=True)
-    
-    # Delete the confirmation message
+    await _clear_previous_invoice(client, query, user_id)
+    invoice = PremiumInvoice(user_id, days, stars, download_benefit)
     try:
-        await query.message.delete()
-    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
-        logger.debug("Payment confirmation message was already unavailable", exc_info=True)
-    
-    # Create invoice for Telegram Stars payment
-    try:
-        invoice_msg = await client.send_invoice(
-            chat_id=user_id,
-            title=f"Premium - {days} Day{'s' if days > 1 else ''}",
-            description=(
-                f"Get {days} day{'s' if days > 1 else ''} of Premium "
-                f"access with {download_benefit}. Existing Premium is extended."
-            ),
-            payload=f"premium_{days}_{user_id}",
-            currency="XTR",  # Telegram Stars
-            prices=[LabeledPrice(label=f"{days} Day{'s' if days > 1 else ''} Premium", amount=stars)]
-        )
-        # Track this invoice message
+        invoice_msg = await _send_premium_invoice(client, invoice)
         last_invoice_messages[user_id] = invoice_msg.id
         await query.answer()
     except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
@@ -111,7 +172,17 @@ async def handle_pre_checkout_handler(client, query: PreCheckoutQuery):
                 days = int(parts[1])
                 user_id = int(parts[2])
                 
-                if days in PREMIUM_PRICES and user_id == query.from_user.id:
+                settings = await get_global_settings()
+                expected_price = get_stars_price(settings, days)
+                is_valid = (
+                    settings["premium_purchases_enabled"]
+                    and settings["stars_payments_enabled"]
+                    and days in PLAN_DAYS
+                    and user_id == query.from_user.id
+                    and query.currency == "XTR"
+                    and query.total_amount == expected_price
+                )
+                if is_valid:
                     await query.answer(ok=True)
                     return
         
@@ -130,6 +201,9 @@ async def handle_successful_payment_handler(client, message):
             parts = payload.split("_")
             days = int(parts[1])
             user_id = message.from_user.id
+            payload_user_id = int(parts[2])
+            if days not in PLAN_DAYS or payload_user_id != user_id:
+                raise ValueError("Invalid successful payment payload")
             
             # Activate/extend premium
             new_expiry = await db.set_premium(user_id, days)
