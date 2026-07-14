@@ -2,6 +2,7 @@ import motor.motor_asyncio
 
 from info import DATABASE_NAME, USER_DB_URI
 from database.global_settings_db import GlobalSettingsMixin
+from database.request_records_db import RequestRecordsMixin
 from database.users_chats_premium_db import PremiumUsageMixin
 from database.users_chats_settings_db import ChatSettingsMixin
 from database.users_chats_user_db import UserRecordsMixin
@@ -9,6 +10,7 @@ from database.users_chats_user_db import UserRecordsMixin
 
 class Database(
     PremiumUsageMixin,
+    RequestRecordsMixin,
     UserRecordsMixin,
     ChatSettingsMixin,
     GlobalSettingsMixin,
@@ -21,5 +23,6 @@ class Database(
         self.users = self.db.uersz
         self.global_settings = self.db.global_settings
         self.global_settings_audit = self.db.global_settings_audit
+        self.book_requests = self.db.book_requests
 
 db = Database(USER_DB_URI, DATABASE_NAME)
