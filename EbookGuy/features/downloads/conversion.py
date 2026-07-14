@@ -7,9 +7,13 @@ from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pymongo.errors import PyMongoError
 
-from Script import script
 from database.ia_filterdb import get_file_details
 from database.users_chats_db import db
+from EbookGuy.features.downloads.limits import (
+    auto_delete_notice,
+    delete_delivered_messages,
+)
+from EbookGuy.shared.formatting import format_file_caption
 from EbookGuy.shared.global_settings import get_global_settings
 from utils import get_size
 
@@ -18,6 +22,7 @@ logger = logging.getLogger(__name__)
 CONVERTIBLE_FORMATS = ("epub", "pdf", "mobi")
 PREVIEW_FORMATS = (*CONVERTIBLE_FORMATS, "azw", "azw3")
 CONVERSION_TIMEOUT_SECONDS = 120
+BYTES_PER_MB = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -28,7 +33,6 @@ class ConversionRequest:
     target_format: str
     input_path: str
     output_path: str
-    protect_content: bool
     clean_title: str
 
 
@@ -61,35 +65,44 @@ async def _run_conversion(input_path, output_path):
 
 
 async def _deliver_conversion(client, query, conversion):
+    settings = await get_global_settings()
     file_name = f"{conversion.clean_title}.{conversion.target_format}"
-    caption = (
+    fallback_caption = (
         f"<code>{file_name}</code>\n"
         f"<b>Converted:</b> {conversion.source_format.upper()} "
         f"\u2192 {conversion.target_format.upper()}"
     )
+    caption = format_file_caption(
+        file_name,
+        get_size(os.path.getsize(conversion.output_path)),
+        fallback_caption,
+    ) or fallback_caption
     await query.message.delete()
     sent_message = await client.send_document(
         chat_id=conversion.user_id,
         document=conversion.output_path,
         file_name=file_name,
         caption=caption,
-        protect_content=conversion.protect_content,
+        protect_content=bool(settings["protect_content"]),
     )
     await db.increment_conversions(conversion.user_id)
-    settings = await get_global_settings()
     daily_limit = int(settings["premium_daily_conversion_limit"])
     remaining = await db.get_remaining_conversions(
         conversion.user_id,
         daily_limit,
     )
-    count_message = await sent_message.reply(
+    count_text = (
         "\u2705 <b>Conversion complete!</b>\n"
-        f"<i>({_remaining_conversion_text(remaining)})</i>\n\n"
-        + script.IMPORTANT_DELETE_MSG
+        f"<i>({_remaining_conversion_text(remaining)})</i>"
     )
-    await asyncio.sleep(600)
-    await sent_message.delete()
-    await count_message.delete()
+    if settings["auto_delete_enabled"]:
+        count_text += "\n\n" + auto_delete_notice(
+            int(settings["auto_delete_delay_seconds"])
+        )
+    count_message = await sent_message.reply(count_text)
+    was_deleted = await delete_delivered_messages((sent_message,), settings)
+    if was_deleted:
+        await count_message.delete()
 
 
 def _premium_conversion_markup(prefix, file_id):
@@ -139,11 +152,31 @@ def _remaining_conversion_text(remaining):
     return f"{remaining} conversion(s) remaining today"
 
 
+async def _check_conversion_policy(query, file, settings):
+    if not settings["downloads_enabled"]:
+        await query.answer("Downloads are temporarily disabled.", show_alert=True)
+        return False
+    if not settings["conversion_enabled"]:
+        await query.answer("Conversions are temporarily disabled.", show_alert=True)
+        return False
+    size_limit = int(settings["max_conversion_size_mb"])
+    if size_limit and int(file.get("file_size") or 0) > size_limit * BYTES_PER_MB:
+        await query.answer(
+            f"Conversion files are limited to {size_limit} MB.",
+            show_alert=True,
+        )
+        return False
+    return True
+
+
 async def _load_conversion(query):
-    _, prefix, file_id, target_format = query.data.split("#", 3)
+    _, _prefix, file_id, target_format = query.data.split("#", 3)
     file = await get_file_details(file_id)
     if not file:
         await query.answer("File not found.", show_alert=True)
+        return None
+    settings = await get_global_settings()
+    if not await _check_conversion_policy(query, file, settings):
         return None
     source_format = _detect_format(
         file["file_name"],
@@ -162,13 +195,26 @@ async def _load_conversion(query):
         target_format=target_format,
         input_path=f"/tmp/{file_id}.{source_format}",
         output_path=f"/tmp/{file_id}.{target_format}",
-        protect_content=prefix == "filep",
         clean_title=_clean_title(file["file_name"]),
     )
 
 
+async def _load_conversion_menu_file(query, file_id):
+    settings = await get_global_settings()
+    file = await get_file_details(file_id)
+    if not file:
+        await query.answer("File not found.", show_alert=True)
+        return None, settings
+    if not await _check_conversion_policy(query, file, settings):
+        return None, settings
+    return file, settings
+
+
 async def handle_convert_menu_callback(client, query):
     _, prefix, file_id = query.data.split("#", 2)
+    file, settings = await _load_conversion_menu_file(query, file_id)
+    if file is None:
+        return
     is_premium, _ = await db.get_premium_status(query.from_user.id)
     if not is_premium:
         await query.message.edit_text(
@@ -178,7 +224,6 @@ async def handle_convert_menu_callback(client, query):
             reply_markup=_premium_conversion_markup(prefix, file_id),
         )
         return
-    settings = await get_global_settings()
     daily_limit = int(settings["premium_daily_conversion_limit"])
     remaining = await db.get_remaining_conversions(
         query.from_user.id,
@@ -190,10 +235,6 @@ async def handle_convert_menu_callback(client, query):
             "Try again tomorrow!",
             show_alert=True,
         )
-        return
-    file = await get_file_details(file_id)
-    if not file:
-        await query.answer("File not found.", show_alert=True)
         return
     source_format = _detect_format(
         file["file_name"],
@@ -275,7 +316,8 @@ async def handle_convert_back_callback(client, query):
             )
         ]
     ]
-    if _detect_format(title):
+    settings = await get_global_settings()
+    if _detect_format(title) and settings["conversion_enabled"]:
         buttons.append(
             [
                 InlineKeyboardButton(
