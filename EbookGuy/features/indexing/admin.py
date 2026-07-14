@@ -12,6 +12,7 @@ from database.indexing_checkpoints import (
 from info import ADMINS
 from EbookGuy.features.indexing.models import IndexRequest
 from EbookGuy.features.indexing.worker import index_files_to_db, lock
+from EbookGuy.shared.global_settings import get_global_settings
 from utils import temp
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,10 @@ async def _reply_checkpoint_list(message, checkpoints):
 
 async def handle_resume_indexing(bot, message):
     """Show actions for saved indexing checkpoints."""
+    settings = await get_global_settings()
+    if not settings["indexing_enabled"]:
+        await message.reply("Indexing is temporarily disabled.")
+        return
     checkpoints = await get_all_checkpoints()
     if not checkpoints:
         await message.reply(
@@ -112,6 +117,10 @@ async def handle_resume_indexing(bot, message):
 async def handle_resume_callback(bot, query):
     if query.from_user.id not in ADMINS:
         return await query.answer("Only admins can do this!", show_alert=True)
+    settings = await get_global_settings()
+    if not settings["indexing_enabled"]:
+        await query.answer("Indexing is temporarily disabled.", show_alert=True)
+        return
     
     chat_id = query.data.split('#')[1]
     try:
