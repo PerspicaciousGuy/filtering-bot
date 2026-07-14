@@ -40,6 +40,13 @@ async def get_global_settings() -> dict[str, object]:
         return settings.copy()
 
 
+def get_cached_global_setting(key: str) -> object:
+    """Return a cached setting for synchronous formatting helpers."""
+    if _settings_cache is None:
+        return DEFAULT_GLOBAL_SETTINGS[key]
+    return _settings_cache.get(key, DEFAULT_GLOBAL_SETTINGS[key])
+
+
 async def save_global_setting(
     key: str,
     value: object,
@@ -105,6 +112,7 @@ def describe_daily_limit(value: object) -> str:
 
 __all__ = [
     "describe_daily_limit",
+    "get_cached_global_setting",
     "get_global_settings",
     "reset_global_setting",
     "save_global_setting",
