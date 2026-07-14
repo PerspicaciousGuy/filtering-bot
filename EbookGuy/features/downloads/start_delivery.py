@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import binascii
 import logging
@@ -11,12 +10,15 @@ from Script import script
 from database.ia_filterdb import get_file_details
 from EbookGuy.features.downloads.callbacks import get_file_again_markup
 from EbookGuy.features.downloads.limits import (
+    auto_delete_notice,
     check_and_increment_download,
+    delete_delivered_messages,
     download_count_text,
     send_auto_delete_message,
     send_download_limit_message,
 )
 from EbookGuy.shared.formatting import format_file_caption
+from EbookGuy.shared.global_settings import get_global_settings
 from utils import get_size, temp
 
 
@@ -60,7 +62,7 @@ async def _download_permission(message, file_size=0):
 
 
 async def send_bulk_files(client, message, payload):
-    prefix, file_key = _parse_payload(payload)
+    _prefix, file_key = _parse_payload(payload)
     files = temp.GETALL.get(file_key)
     if not files:
         await message.reply(script.NO_FILE_EXIST)
@@ -69,12 +71,19 @@ async def send_bulk_files(client, message, payload):
     access = await _download_permission(message, largest_file)
     if access is None:
         return
+    settings = await get_global_settings()
     sent_messages = []
     for file in files:
+        caption = format_file_caption(
+            file["file_name"],
+            get_size(file["file_size"]),
+            file.get("caption"),
+        )
         sent_messages.append(await client.send_cached_media(
             chat_id=message.from_user.id,
             file_id=file["file_id"],
-            protect_content=prefix == "allfilesp",
+            caption=caption,
+            protect_content=bool(settings["protect_content"]),
             reply_markup=None,
         ))
     await message.reply_text(download_count_text(access))
@@ -88,51 +97,56 @@ def _decode_legacy_payload(payload):
 
 
 async def _send_legacy_file(client, message, payload):
-    prefix, file_id = _decode_legacy_payload(payload)
+    _prefix, file_id = _decode_legacy_payload(payload)
     access = await _download_permission(message)
     if access is None:
         return
+    settings = await get_global_settings()
     sent = await client.send_cached_media(
         chat_id=message.from_user.id,
         file_id=file_id,
-        protect_content=prefix == "filep",
+        protect_content=bool(settings["protect_content"]),
         reply_markup=None,
     )
     media = getattr(sent, sent.media.value)
     caption = format_file_caption(media.file_name, get_size(media.file_size))
     await sent.edit_caption(caption=caption or f"<code>{media.file_name}</code>")
-    count_message = await sent.reply(
-        download_count_text(access)
-        + "\n\n"
-        + script.IMPORTANT_DELETE_MSG
-    )
-    await asyncio.sleep(600)
-    await sent.delete()
+    count_text = download_count_text(access)
+    if settings["auto_delete_enabled"]:
+        count_text += "\n\n" + auto_delete_notice(
+            int(settings["auto_delete_delay_seconds"])
+        )
+    count_message = await sent.reply(count_text)
+    was_deleted = await delete_delivered_messages((sent,), settings)
+    if not was_deleted:
+        return
     await count_message.edit_text(
         script.FILE_DELETED_BTN,
         reply_markup=get_file_again_markup(file_id),
     )
 
 
-def _file_action_markup(prefix, file_id, title):
+def _file_action_markup(view, settings):
     buttons = [[InlineKeyboardButton(
         "\U0001f4e5 Download",
-        callback_data=f"download_book#{prefix}#{file_id}",
+        callback_data=f"download_book#{view.prefix}#{view.file_id}",
     )]]
+    title = view.file["file_name"]
     detected_format = next(
         (word for word in reversed(title.lower().split())
          if word in CONVERTIBLE_FORMATS),
         None,
     )
-    if detected_format:
+    if detected_format and settings["conversion_enabled"]:
         buttons.append([InlineKeyboardButton(
             "\U0001f504 Convert Format",
-            callback_data=f"convert_menu#{prefix}#{file_id}",
+            callback_data=f"convert_menu#{view.prefix}#{view.file_id}",
         )])
     return InlineKeyboardMarkup(buttons)
 
 
 async def _show_file_details(message, view):
+    settings = await get_global_settings()
     title = view.file["file_name"]
     clean_title = " ".join(
         word for word in title.split()
@@ -143,7 +157,7 @@ async def _show_file_details(message, view):
             f"<b>\U0001f4d6 {clean_title}</b>\n"
             f"<b>\U0001f4e6 Size:</b> {get_size(view.file['file_size'])}"
         ),
-        reply_markup=_file_action_markup(view.prefix, view.file_id, title),
+        reply_markup=_file_action_markup(view, settings),
     )
 
 
