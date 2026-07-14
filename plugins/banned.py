@@ -8,7 +8,7 @@ from utils import temp
 from pyrogram.types import Message
 from database.users_chats_db import db
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from info import SUPPORT_CHAT
+from EbookGuy.shared.global_settings import get_global_settings
 
 async def banned_users(_, client, message: Message):
     return (
@@ -30,8 +30,9 @@ async def ban_reply(bot, message):
 
 @Client.on_message(filters.group & disabled_group & filters.incoming)
 async def grp_bd(bot, message):
+    settings = await get_global_settings()
     buttons = [[
-        InlineKeyboardButton('Support', url=f'https://t.me/{SUPPORT_CHAT}')
+        InlineKeyboardButton('Support', url=str(settings["support_url"]))
     ]]
     reply_markup=InlineKeyboardMarkup(buttons)
     disabled_chat_record = await db.get_chat(message.chat.id)
