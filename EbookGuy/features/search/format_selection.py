@@ -3,6 +3,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from EbookGuy.features.search.expiry import SearchExpiry, schedule_search_expiry
 from EbookGuy.features.search.results import AutoFilterRequest, auto_filter
 from EbookGuy.features.search.state import MockMessage, PENDING_SEARCH
+from EbookGuy.features.downloads.force_subscription import enforce_subscription
 from EbookGuy.shared.global_settings import get_global_settings
 
 
@@ -34,6 +35,8 @@ async def show_format_selection(message, query_text, settings):
 async def handle_private_text(bot, message):
     content = message.text
     if content.startswith("/") or content.startswith("#"): return  # ignore commands and hashtags
+    if await enforce_subscription(bot, message):
+        return
     settings = await get_global_settings()
     if not settings["search_enabled"]:
         await message.reply_text("<b>Search is temporarily disabled.</b>")
