@@ -102,6 +102,20 @@ async def reset_global_setting(key: str, admin_id: int) -> tuple[object, object]
     return previous_value, default_value
 
 
+async def record_admin_action(
+    action: str,
+    admin_id: int,
+    details: dict[str, object],
+) -> None:
+    """Append one non-setting administrator action to the audit log."""
+    await _record_setting_change({
+        "action": action,
+        "admin_id": int(admin_id),
+        "details": details,
+        "changed_at": datetime.now(timezone.utc),
+    })
+
+
 def describe_daily_limit(value: object) -> str:
     """Describe a configured daily download allowance."""
     limit = int(value)
@@ -114,6 +128,7 @@ __all__ = [
     "describe_daily_limit",
     "get_cached_global_setting",
     "get_global_settings",
+    "record_admin_action",
     "reset_global_setting",
     "save_global_setting",
 ]
