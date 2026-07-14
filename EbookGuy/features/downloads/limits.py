@@ -7,6 +7,7 @@ from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.users_chats_db import db
+from EbookGuy.shared.analytics import track_event
 from EbookGuy.shared.global_settings import get_global_settings
 
 
@@ -135,17 +136,36 @@ async def check_and_increment_download(user_id, file_size=0):
     """Check the user's limits, increment an allowed download, and return its state."""
     settings = await get_global_settings()
     if not settings["downloads_enabled"]:
-        return DownloadAccess(
+        access = DownloadAccess(
             False,
             False,
             0,
             0,
             denial_reason="downloads_disabled",
         )
+        track_event(
+            "download.denied",
+            user_id,
+            is_premium=False,
+            reason=access.denial_reason,
+        )
+        return access
     is_premium, _ = await db.get_premium_status(user_id)
     if is_premium:
-        return await _check_premium_download(user_id, file_size, settings)
-    return await _check_free_download(user_id, file_size, settings)
+        access = await _check_premium_download(user_id, file_size, settings)
+    else:
+        access = await _check_free_download(user_id, file_size, settings)
+    track_event(
+        "download.completed" if access.is_allowed else "download.denied",
+        user_id,
+        is_premium=bool(access.is_premium),
+        reason=(
+            "allowed"
+            if access.is_allowed
+            else access.denial_reason or "daily_limit"
+        ),
+    )
+    return access
 
 
 def download_count_text(access):
