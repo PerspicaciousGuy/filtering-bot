@@ -14,11 +14,14 @@ from database.ia_filterdb import col, sec_col
 from database.users_chats_db import db
 from EbookGuy.bot import EbookGuyBot
 from EbookGuy.bot.clients import initialize_clients
+from EbookGuy.features.premium.expiry_notifications import (
+    run_premium_expiry_notifier,
+)
+from EbookGuy.shared.global_settings import get_global_settings
 from EbookGuy.util.keepalive import ping_server
 from info import (
     AUTH_CHANNEL,
     CHANNELS,
-    LOG_CHANNEL,
     ON_HEROKU,
     PORT,
 )
@@ -95,7 +98,10 @@ async def _send_restart_notifications():
         date.today(),
         datetime.now(timezone).strftime("%H:%M:%S %p"),
     )
-    await _notify_restart(LOG_CHANNEL, restart_text)
+    settings = await get_global_settings()
+    log_channel_id = int(settings["log_channel_id"])
+    if log_channel_id:
+        await _notify_restart(log_channel_id, restart_text)
 
     for channel_id in CHANNELS:
         message = await _notify_restart(
@@ -122,6 +128,7 @@ async def start():
     await web_server()
     await _initialize_bot_state()
     asyncio.create_task(_refresh_library_count())
+    asyncio.create_task(run_premium_expiry_notifier(EbookGuyBot))
     logger.info(script.LOGO)
     await _send_restart_notifications()
     await idle()
