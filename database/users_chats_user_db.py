@@ -1,3 +1,6 @@
+import datetime
+
+
 class UserRecordsMixin:
     def new_user(self, id, name):
         return dict(
@@ -7,6 +10,9 @@ class UserRecordsMixin:
             caption=None,
             message_command=None,
             save=False,
+            created_at=datetime.datetime.now(datetime.timezone.utc).replace(
+                tzinfo=None
+            ),
             ban_status=dict(
                 is_banned=False,
                 ban_reason="",

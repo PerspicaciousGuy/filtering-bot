@@ -183,3 +183,23 @@ class PremiumUsageMixin:
         ]
         result = await self.col.aggregate(pipeline).to_list(length=1)
         return result[0]['total'] if result else 0
+
+    async def count_users_with_daily_downloads(self):
+        """Return users with a non-zero download count for today."""
+        today = str(datetime.date.today())
+        return await self.col.count_documents({
+            'last_download_date': today,
+            'daily_downloads': {'$gt': 0},
+        })
+
+    async def reset_all_daily_downloads(self):
+        """Reset every non-zero download counter for the current day."""
+        today = str(datetime.date.today())
+        result = await self.col.update_many(
+            {
+                'last_download_date': today,
+                'daily_downloads': {'$gt': 0},
+            },
+            {'$set': {'daily_downloads': 0, 'last_download_date': today}},
+        )
+        return int(result.modified_count)
