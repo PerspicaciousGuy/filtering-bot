@@ -13,6 +13,7 @@ from EbookGuy.features.downloads.limits import (
     auto_delete_notice,
     delete_delivered_messages,
 )
+from EbookGuy.shared.analytics import track_event
 from EbookGuy.shared.formatting import format_file_caption
 from EbookGuy.shared.global_settings import get_global_settings
 from utils import get_size
@@ -34,6 +35,14 @@ class ConversionRequest:
     input_path: str
     output_path: str
     clean_title: str
+
+
+def _track_conversion_failure(conversion, reason):
+    track_event(
+        "conversion.failed",
+        conversion.user_id,
+        reason=reason,
+    )
 
 
 def _detect_format(file_name, formats=PREVIEW_FORMATS):
@@ -86,6 +95,12 @@ async def _deliver_conversion(client, query, conversion):
         protect_content=bool(settings["protect_content"]),
     )
     await db.increment_conversions(conversion.user_id)
+    track_event(
+        "conversion.completed",
+        conversion.user_id,
+        source_format=conversion.source_format,
+        target_format=conversion.target_format,
+    )
     daily_limit = int(settings["premium_daily_conversion_limit"])
     remaining = await db.get_remaining_conversions(
         conversion.user_id,
@@ -279,6 +294,7 @@ async def handle_do_convert_callback(client, query):
             conversion.output_path,
         )
         if not converted:
+            _track_conversion_failure(conversion, "converter_rejected_file")
             await query.message.edit_text(
                 "\u274c <b>Conversion failed.</b> The file may be "
                 "DRM-protected or corrupted."
@@ -286,10 +302,12 @@ async def handle_do_convert_callback(client, query):
             return
         await _deliver_conversion(client, query, conversion)
     except asyncio.TimeoutError:
+        _track_conversion_failure(conversion, "timeout")
         await query.message.edit_text(
             "\u274c <b>Conversion timed out.</b> Please try again."
         )
     except (OSError, PyMongoError, RPCError):
+        _track_conversion_failure(conversion, "runtime_error")
         logger.exception("Failed to convert file")
         await query.message.edit_text(
             "<b>Conversion failed.</b> Please try again later."

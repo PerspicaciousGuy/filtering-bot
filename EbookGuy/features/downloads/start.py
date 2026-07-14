@@ -6,6 +6,7 @@ from EbookGuy.features.downloads.start_views import (
     get_start_buttons,
     show_start_message,
 )
+from EbookGuy.shared.analytics import track_event
 from EbookGuy.shared.global_settings import get_global_settings
 
 
@@ -17,6 +18,7 @@ async def _register_user(client, message):
     if await db.is_user_exist(user.id):
         return
     await db.add_user(user.id, user.first_name)
+    track_event("user.registered", user.id)
     settings = await get_global_settings()
     log_channel_id = int(settings["log_channel_id"])
     if not log_channel_id:
