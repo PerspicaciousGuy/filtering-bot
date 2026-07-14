@@ -1,8 +1,12 @@
 """Display metadata and category ownership for global bot settings."""
 
+from EbookGuy.shared.settings_descriptions import SETTING_DESCRIPTIONS
+
 
 CATEGORY_LABELS = {
     "usage": "Usage Limits",
+    "access": "Access & Welcome",
+    "channels": "Channels",
     "search": "Search",
     "delivery": "Delivery",
     "requests": "Requests",
@@ -19,12 +23,23 @@ SETTING_LABELS = {
     "free_max_file_size_mb": "Free maximum file size",
     "premium_max_file_size_mb": "Premium maximum file size",
     "premium_daily_conversion_limit": "Premium conversions per day",
+    "file_channel_ids": "File indexing channels",
+    "delete_channel_ids": "File deletion channels",
+    "index_request_channel_id": "Index-request channel ID",
+    "support_chat_id": "Support fallback chat ID",
+    "force_subscription_enabled": "Force subscription",
+    "required_subscription_channels": "Required subscription channels",
+    "welcome_message_enabled": "Custom welcome message",
+    "welcome_message_template": "Welcome message template",
     "search_enabled": "Search enabled",
     "results_per_page": "Results per page",
     "max_search_results": "Maximum search results",
     "search_suggestions_enabled": "Search suggestions",
     "search_result_expiry_seconds": "Search result expiry",
     "use_caption_filter": "Search file captions",
+    "trending_searches_enabled": "Trending searches",
+    "trending_period_days": "Trending period",
+    "trending_results_limit": "Trending result count",
     "downloads_enabled": "Downloads enabled",
     "protect_content": "Protect delivered files",
     "auto_delete_enabled": "Auto-delete delivered files",
@@ -38,6 +53,11 @@ SETTING_LABELS = {
     "allow_duplicate_requests": "Allow duplicate requests",
     "request_channel_id": "Request channel ID",
     "request_notifications_enabled": "Request notifications",
+    "request_author_required": "Require author name",
+    "request_processing_message": "Processing request message",
+    "request_unavailable_message": "Unavailable request message",
+    "request_uploaded_message": "Uploaded request message",
+    "request_already_available_message": "Already available request message",
     "premium_purchases_enabled": "Premium purchases",
     "stars_payments_enabled": "Telegram Stars payments",
     "premium_30_days_stars": "30-day Stars price",
@@ -53,120 +73,6 @@ SETTING_LABELS = {
     "support_url": "Support URL",
 }
 
-SETTING_DESCRIPTIONS = {
-    "free_daily_limit": (
-        "Maximum indexed-file downloads allowed for each free user per day. "
-        "Set it to 0 for unlimited downloads."
-    ),
-    "premium_daily_limit": (
-        "Maximum indexed-file downloads allowed for each premium user per day. "
-        "Set it to 0 for unlimited downloads."
-    ),
-    "premium_download_cooldown_seconds": (
-        "Minimum wait between premium downloads, measured in seconds. "
-        "Set it to 0 to remove the cooldown."
-    ),
-    "free_max_file_size_mb": (
-        "Largest indexed file a free user may download, measured in MB. "
-        "Set it to 0 to allow any size."
-    ),
-    "premium_max_file_size_mb": (
-        "Largest indexed file a premium user may download, measured in MB. "
-        "Set it to 0 to allow any size."
-    ),
-    "premium_daily_conversion_limit": (
-        "Maximum audiobook conversions allowed for each premium user per day. "
-        "Set it to 0 for unlimited conversions."
-    ),
-    "search_enabled": (
-        "Controls private and inline book search for users. Admin settings remain "
-        "available when search is disabled."
-    ),
-    "results_per_page": (
-        "Number of books shown on each private search results page."
-    ),
-    "max_search_results": (
-        "Maximum number of matching books retained for one search and its pages."
-    ),
-    "search_suggestions_enabled": (
-        "Allows the bot to retry broad searches and show suggestion links when "
-        "an exact search has no results."
-    ),
-    "search_result_expiry_seconds": (
-        "How long private search results remain available before their message "
-        "and cached state are removed."
-    ),
-    "use_caption_filter": (
-        "Includes stored Telegram file captions when matching search terms."
-    ),
-    "downloads_enabled": "Controls whether users can start file downloads.",
-    "protect_content": (
-        "Prevents Telegram forwarding and saving for files delivered by the bot."
-    ),
-    "auto_delete_enabled": (
-        "Controls whether delivered files are removed automatically after a delay."
-    ),
-    "auto_delete_delay_seconds": (
-        "Time in seconds before an automatically delivered file is deleted."
-    ),
-    "custom_file_caption": (
-        "Caption template applied to files delivered by the bot."
-    ),
-    "conversion_enabled": (
-        "Controls whether eligible audiobook conversion workflows are available."
-    ),
-    "max_conversion_size_mb": (
-        "Largest source file accepted for conversion, measured in MB."
-    ),
-    "requests_enabled": "Controls whether users can submit book requests.",
-    "request_daily_limit": (
-        "Maximum book requests allowed for each user per day."
-    ),
-    "request_cooldown_seconds": (
-        "Minimum wait between book requests, measured in seconds."
-    ),
-    "allow_duplicate_requests": (
-        "Controls whether a title may be requested more than once."
-    ),
-    "request_channel_id": (
-        "Telegram channel that receives submitted book requests."
-    ),
-    "request_notifications_enabled": (
-        "Controls whether request-related notifications are sent."
-    ),
-    "premium_purchases_enabled": (
-        "Controls whether users can start a premium purchase."
-    ),
-    "stars_payments_enabled": (
-        "Controls whether Telegram Stars is offered as a payment method."
-    ),
-    "premium_30_days_stars": (
-        "Telegram Stars price for 30 days of premium access."
-    ),
-    "premium_90_days_stars": (
-        "Telegram Stars price for 90 days of premium access."
-    ),
-    "premium_30_days_inr": "INR price for 30 days of premium access.",
-    "premium_90_days_inr": "INR price for 90 days of premium access.",
-    "premium_expiry_notifications_enabled": (
-        "Controls whether users are notified before premium access expires."
-    ),
-    "maintenance_mode": (
-        "Temporarily restricts normal user features while maintenance is active."
-    ),
-    "maintenance_message": (
-        "Message shown to users while maintenance mode is active."
-    ),
-    "indexing_enabled": (
-        "Controls whether administrators can add new files to the search index."
-    ),
-    "broadcasts_enabled": (
-        "Controls whether administrator broadcast commands may send messages."
-    ),
-    "log_channel_id": "Telegram channel used for operational bot logs.",
-    "support_url": "Support destination shown to users who need assistance.",
-}
-
 CATEGORY_SETTINGS = {
     "usage": (
         "free_daily_limit",
@@ -176,6 +82,20 @@ CATEGORY_SETTINGS = {
         "premium_max_file_size_mb",
         "premium_daily_conversion_limit",
     ),
+    "access": (
+        "force_subscription_enabled",
+        "required_subscription_channels",
+        "welcome_message_enabled",
+        "welcome_message_template",
+    ),
+    "channels": (
+        "file_channel_ids",
+        "delete_channel_ids",
+        "request_channel_id",
+        "index_request_channel_id",
+        "log_channel_id",
+        "support_chat_id",
+    ),
     "search": (
         "search_enabled",
         "results_per_page",
@@ -183,6 +103,9 @@ CATEGORY_SETTINGS = {
         "search_suggestions_enabled",
         "search_result_expiry_seconds",
         "use_caption_filter",
+        "trending_searches_enabled",
+        "trending_period_days",
+        "trending_results_limit",
     ),
     "delivery": (
         "downloads_enabled",
@@ -198,8 +121,12 @@ CATEGORY_SETTINGS = {
         "request_daily_limit",
         "request_cooldown_seconds",
         "allow_duplicate_requests",
-        "request_channel_id",
         "request_notifications_enabled",
+        "request_author_required",
+        "request_processing_message",
+        "request_unavailable_message",
+        "request_uploaded_message",
+        "request_already_available_message",
     ),
     "premium": (
         "premium_purchases_enabled",
@@ -215,7 +142,6 @@ CATEGORY_SETTINGS = {
         "maintenance_message",
         "indexing_enabled",
         "broadcasts_enabled",
-        "log_channel_id",
         "support_url",
     ),
 }
