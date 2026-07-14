@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from Script import script
 from database.users_chats_db import db
 from EbookGuy.shared.global_settings import get_global_settings
 
@@ -39,6 +38,8 @@ def _premium_upgrade_markup():
 
 
 def _limit_message(access):
+    if access.denial_reason == "downloads_disabled":
+        return "<b>Downloads Temporarily Disabled</b>\n\nPlease try again later."
     if access.denial_reason == "file_size":
         return (
             "<b>File Too Large</b>\n\n"
@@ -50,30 +51,35 @@ def _limit_message(access):
             f"Please wait <b>{access.cooldown_remaining} seconds</b> "
             "before your next download."
         )
-    plan = "premium" if access.is_premium else "free"
+    if not access.is_premium:
+        return (
+            "<b>Free Downloads Used</b>\n\n"
+            "You have used all your free downloads for today. "
+            "Upgrade to the <b>Premium plan</b> for higher daily limits."
+        )
     return (
         "<b>Daily Limit Reached</b>\n\n"
-        f"You have reached the {plan} limit of "
+        "You have reached the premium limit of "
         f"<b>{access.daily_limit} download(s) per day</b>."
     )
 
 
 async def send_download_limit_message(message, access):
     """Reply with the applicable rich download-denial message."""
+    can_upgrade = (
+        not access.is_premium
+        and access.denial_reason != "downloads_disabled"
+    )
     await message.reply_text(
         text=_limit_message(access),
-        reply_markup=(
-            None if access.is_premium else _premium_upgrade_markup()
-        ),
+        reply_markup=_premium_upgrade_markup() if can_upgrade else None,
     )
 
 
 async def answer_download_limit_callback(query, access):
-    """Answer a callback with the applicable download-denial response."""
-    await query.answer(
-        _limit_message(access).replace("<b>", "").replace("</b>", ""),
-        show_alert=True,
-    )
+    """Acknowledge a denied callback and send its response in the chat."""
+    await query.answer()
+    await send_download_limit_message(query.message, access)
 
 
 def _size_denial(is_premium, file_size, limits):
@@ -128,6 +134,14 @@ async def _check_free_download(user_id, file_size, settings):
 async def check_and_increment_download(user_id, file_size=0):
     """Check the user's limits, increment an allowed download, and return its state."""
     settings = await get_global_settings()
+    if not settings["downloads_enabled"]:
+        return DownloadAccess(
+            False,
+            False,
+            0,
+            0,
+            denial_reason="downloads_disabled",
+        )
     is_premium, _ = await db.get_premium_status(user_id)
     if is_premium:
         return await _check_premium_download(user_id, file_size, settings)
@@ -140,14 +154,24 @@ def download_count_text(access):
     return f"<b>Downloads today:</b> <code>{access.count}/{limit}</code>"
 
 
-async def send_auto_delete_message(client, user_id, filesarr):
-    """Send auto-delete warning and delete files after 10 minutes."""
-    warning_message = await client.send_message(
-        chat_id=user_id,
-        text=script.IMPORTANT_DELETE_MSG,
+def auto_delete_notice(delay_seconds):
+    """Build a delivery warning for the configured deletion delay."""
+    if delay_seconds % 60 == 0:
+        duration = f"{delay_seconds // 60} minute(s)"
+    else:
+        duration = f"{delay_seconds} second(s)"
+    return (
+        "<b>Important:</b> This file will be deleted in "
+        f"<b>{duration}</b>. Save it before then."
     )
-    await asyncio.sleep(600)
-    for message in filesarr:
+
+
+async def delete_delivered_messages(messages, settings):
+    """Delete delivered Telegram messages when auto-delete is enabled."""
+    if not settings["auto_delete_enabled"]:
+        return False
+    await asyncio.sleep(int(settings["auto_delete_delay_seconds"]))
+    for message in messages:
         try:
             await message.delete()
         except RPCError:
@@ -155,6 +179,20 @@ async def send_auto_delete_message(client, user_id, filesarr):
                 "Auto-delete message was already unavailable",
                 exc_info=True,
             )
+    return True
+
+
+async def send_auto_delete_message(client, user_id, filesarr):
+    """Warn about and apply the configured delivery deletion policy."""
+    settings = await get_global_settings()
+    if not settings["auto_delete_enabled"]:
+        return
+    delay_seconds = int(settings["auto_delete_delay_seconds"])
+    warning_message = await client.send_message(
+        chat_id=user_id,
+        text=auto_delete_notice(delay_seconds),
+    )
+    await delete_delivered_messages(filesarr, settings)
     await warning_message.edit_text(
         "<b>\u2705 Your message is successfully deleted</b>"
     )
