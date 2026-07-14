@@ -4,6 +4,7 @@ from database.search_repository import SearchRequest, get_search_results
 from EbookGuy.features.search.models import AutoFilterRequest, SearchOutcome
 from EbookGuy.features.search.page_navigation import handle_next_page
 from EbookGuy.features.search.rendering import show_no_results, show_search_results
+from EbookGuy.shared.analytics import SearchAnalyticsEvent, track_search
 from EbookGuy.shared.global_settings import get_global_settings
 
 
@@ -87,6 +88,15 @@ async def auto_filter(request):
         search,
         request.format_type,
         settings,
+    )
+    track_search(
+        settings,
+        SearchAnalyticsEvent(
+            user_id=request.message.from_user.id,
+            query=search,
+            result_count=outcome.total_results,
+            source="private",
+        ),
     )
     if not outcome.files:
         await show_no_results(request, settings)
