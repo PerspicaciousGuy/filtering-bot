@@ -23,13 +23,12 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 - **Private bot**: 1-on-1 experience, no group spam
 - **Format selection**: Choose Ebook or Audiobook before searching
 - **Smart search**: Pagination + progressive word-drop fallback for author name queries
-- **Auto-delete**: Files deleted after 10 minutes (copyright compliance)
+- **Auto-delete**: Configurable delivery deletion policy
 - **Force subscribe**: Require channel membership before access
 
 ### Premium (Telegram Stars ⭐)
-- **1 free download/day** for free users
-- **20 downloads/day** for premium users (30s cooldown between downloads)
-- **3 format conversions/day** — EPUB ↔ PDF ↔ MOBI via Calibre
+- Configurable free and premium download limits, cooldowns, and file sizes
+- Configurable premium conversion limits — EPUB ↔ PDF ↔ MOBI via Calibre
 - **Telegram Stars payment**: Native in-app, no external gateways
 - **UPI/PayPal support**: External payment option with INR pricing
 
@@ -51,6 +50,13 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 |------|---------|
 | `info.py` | API keys, DB URLs, channel IDs, pricing |
 | `Script.py` | All user-facing text — edit for tone/language |
+
+### Runtime Settings
+
+Bot administrators can use `/settings` in a private chat to manage Usage,
+Search, Delivery, Requests, Premium, and Bot Operation values. Overrides are
+stored in MongoDB, audited, cached briefly, and applied without a restart.
+Values in `info.py` remain the defaults used when no override is stored.
 
 ### Code Organization
 
@@ -106,6 +112,7 @@ docker run -d -p 8080:8080 --env-file .env ebookguy-bot
 | Command | Description |
 |---------|-------------|
 | `/stats` | Live stats: users, library, downloads, DB size |
+| `/settings` | Manage global runtime bot settings |
 | `/broadcast` | Broadcast to all users |
 | `/grp_broadcast` | Broadcast to all groups |
 | `/ban` / `/unban` | Manage user access |
