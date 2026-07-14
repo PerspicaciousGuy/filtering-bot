@@ -6,7 +6,8 @@ from pyrogram.errors import RPCError, UserIsBlocked
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from Script import script
-from info import ADMINS, CHNL_LNK, REQST_CHANNEL, SUPPORT_CHAT_ID
+from info import ADMINS, CHNL_LNK, SUPPORT_CHAT_ID
+from EbookGuy.shared.global_settings import get_global_settings
 
 
 ACCESS_DENIED_MESSAGE = "You don't have sufficient rights to do this !"
@@ -38,6 +39,7 @@ class RequestNotification:
     query: object
     selection: StatusSelection
     user: object
+    settings: dict[str, object]
 
 
 REQUEST_STATUSES = {
@@ -75,7 +77,7 @@ REQUEST_STATUSES = {
 ALERT_STATUSES = {
     status.alert_callback: status for status in REQUEST_STATUSES.values()
 }
-_request_channel_url = None
+_request_channel_urls = {}
 _request_channel_lock = asyncio.Lock()
 _notification_tasks = set()
 
@@ -99,23 +101,25 @@ def _status_markup(selection):
     return InlineKeyboardMarkup([buttons])
 
 
-async def _request_channel_link(client):
-    global _request_channel_url
-    if _request_channel_url is not None:
-        return _request_channel_url
+async def _request_channel_link(client, channel_id):
+    if not channel_id:
+        return CHNL_LNK
+    if channel_id in _request_channel_urls:
+        return _request_channel_urls[channel_id]
     async with _request_channel_lock:
-        if _request_channel_url is not None:
-            return _request_channel_url
+        if channel_id in _request_channel_urls:
+            return _request_channel_urls[channel_id]
         try:
-            link = await client.create_chat_invite_link(int(REQST_CHANNEL))
-            _request_channel_url = link.invite_link
+            link = await client.create_chat_invite_link(channel_id)
+            channel_url = link.invite_link
         except RPCError:
-            _request_channel_url = CHNL_LNK
-    return _request_channel_url
+            channel_url = CHNL_LNK
+        _request_channel_urls[channel_id] = channel_url
+    return channel_url
 
 
-async def _notification_markup(client, query):
-    channel_url = await _request_channel_link(client)
+async def _notification_markup(client, query, channel_id):
+    channel_url = await _request_channel_link(client, channel_id)
     return InlineKeyboardMarkup(
         [[
             InlineKeyboardButton("Join Channel", url=channel_url),
@@ -125,11 +129,16 @@ async def _notification_markup(client, query):
 
 
 async def _notify_requester(client, notification):
+    settings = notification.settings
     selection = notification.selection
     text = selection.status.notification_template.format(
         notification.user.mention
     )
-    reply_markup = await _notification_markup(client, notification.query)
+    reply_markup = await _notification_markup(
+        client,
+        notification.query,
+        int(settings["request_channel_id"]),
+    )
     try:
         await client.send_message(
             chat_id=int(selection.from_user),
@@ -137,6 +146,9 @@ async def _notify_requester(client, notification):
             reply_markup=reply_markup,
         )
     except UserIsBlocked:
+        if SUPPORT_CHAT_ID is None:
+            logger.info("Requester blocked notification and no fallback chat exists")
+            return
         await client.send_message(
             chat_id=int(SUPPORT_CHAT_ID),
             text=text + BLOCKED_USER_NOTE,
@@ -183,11 +195,15 @@ async def _apply_status_change(client, query, selection):
             f"<b><strike>{query.message.text}</strike></b>",
             reply_markup=_status_markup(selection),
         )
+        settings = await get_global_settings()
+        if not settings["request_notifications_enabled"]:
+            return
         user = await client.get_users(selection.from_user)
         notification = RequestNotification(
             query=query,
             selection=selection,
             user=user,
+            settings=settings,
         )
         await _notify_requester(client, notification)
     except (RPCError, TypeError, ValueError):
