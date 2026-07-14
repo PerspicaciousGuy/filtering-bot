@@ -12,9 +12,10 @@ from pyrogram.types import (
 )
 
 from database.search_repository import SearchRequest, get_search_results
+from EbookGuy.shared.analytics import SearchAnalyticsEvent, track_search
 from EbookGuy.shared.formatting import format_file_caption
 from EbookGuy.shared.global_settings import get_global_settings
-from info import AUTH_CHANNEL, AUTH_USERS
+from info import AUTH_USERS
 from utils import get_size, is_subscribed, temp
 
 
@@ -104,7 +105,7 @@ async def _answer_empty(query, query_text, cache_duration):
 
 
 def _inline_cache_duration(settings):
-    if AUTH_USERS or AUTH_CHANNEL:
+    if AUTH_USERS or settings["force_subscription_enabled"]:
         return 0
     return int(settings["search_result_expiry_seconds"])
 
@@ -136,7 +137,7 @@ async def handle_inline_query(bot, query):
             switch_pm_parameter="hehe",
         )
         return
-    if AUTH_CHANNEL and not await is_subscribed(bot, query):
+    if not await is_subscribed(bot, query):
         await query.answer(
             results=[],
             cache_time=0,
@@ -155,6 +156,15 @@ async def handle_inline_query(bot, query):
         )
         return
     page = await _load_inline_page(query, settings)
+    track_search(
+        settings,
+        SearchAnalyticsEvent(
+            user_id=query.from_user.id,
+            query=page.query_text,
+            result_count=page.total_results,
+            source="inline",
+        ),
+    )
     if not page.results:
         await _answer_empty(query, page.query_text, cache_duration)
         return
