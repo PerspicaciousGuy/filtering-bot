@@ -37,6 +37,29 @@ class PremiumInvoice:
     download_benefit: str
 
 
+@dataclass(frozen=True)
+class PremiumPurchase:
+    """Premium plan details encoded in an invoice payload."""
+
+    user_id: int
+    days: int
+    stars: int | None
+
+
+def _parse_premium_payload(payload):
+    parts = str(payload).split("_")
+    if len(parts) not in (3, 4) or parts[0] != "premium":
+        raise ValueError("Invalid premium invoice payload")
+    purchase = PremiumPurchase(
+        user_id=int(parts[2]),
+        days=int(parts[1]),
+        stars=int(parts[3]) if len(parts) == 4 else None,
+    )
+    if purchase.days not in PLAN_DAYS:
+        raise ValueError("Invalid premium plan")
+    return purchase
+
+
 def _track_payment_success(user_id, payment, days):
     track_event(
         "payment.completed",
@@ -67,7 +90,9 @@ async def _send_premium_invoice(client, invoice):
             f"Get {invoice.days} days of Premium access with "
             f"{invoice.download_benefit}. Existing Premium is extended."
         ),
-        payload=f"premium_{invoice.days}_{invoice.user_id}",
+        payload=(
+            f"premium_{invoice.days}_{invoice.user_id}_{invoice.stars}"
+        ),
         currency="XTR",
         prices=[LabeledPrice(
             label=f"{invoice.days} Days Premium",
@@ -170,68 +195,60 @@ async def handle_confirm_premium_callback(client, query):
         await query.answer()
     except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to create Telegram Stars invoice")
-        await query.answer("Error creating payment. Please try again later.", show_alert=True)
+        await query.answer(
+            "Error creating payment. Please try again later.",
+            show_alert=True,
+        )
 
 async def handle_pre_checkout_handler(client, query: PreCheckoutQuery):
     """Handle pre-checkout query - approve the payment"""
     try:
-        # Parse payload to verify
-        payload = query.invoice_payload
-        if payload.startswith("premium_"):
-            parts = payload.split("_")
-            if len(parts) >= 3:
-                days = int(parts[1])
-                user_id = int(parts[2])
-                
-                settings = await get_global_settings()
-                expected_price = get_stars_price(settings, days)
-                is_valid = (
-                    settings["premium_purchases_enabled"]
-                    and settings["stars_payments_enabled"]
-                    and days in PLAN_DAYS
-                    and user_id == query.from_user.id
-                    and query.currency == "XTR"
-                    and query.total_amount == expected_price
-                )
-                if is_valid:
-                    await query.answer(ok=True)
-                    return
-        
-        await query.answer(ok=False, error_message="Invalid payment request")
+        purchase = _parse_premium_payload(query.invoice_payload)
+        settings = await get_global_settings()
+        configured_price = get_stars_price(settings, purchase.days)
+        expected_price = purchase.stars or configured_price
+        payload_price_is_current = (
+            purchase.stars is None or purchase.stars == configured_price
+        )
+        is_valid = (
+            settings["premium_purchases_enabled"]
+            and settings["stars_payments_enabled"]
+            and payload_price_is_current
+            and purchase.user_id == query.from_user.id
+            and query.currency == "XTR"
+            and query.total_amount == expected_price
+        )
+        await query.answer(
+            ok=is_valid,
+            error_message=None if is_valid else "Invalid payment request",
+        )
     except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed during Telegram Stars pre-checkout")
         await query.answer(ok=False, error_message="Payment verification failed")
 
-async def handle_successful_payment_handler(client, message):
-    """Handle successful payment - activate premium"""
-    try:
-        payment = message.successful_payment
-        payload = payment.invoice_payload
-        
-        if payload.startswith("premium_"):
-            parts = payload.split("_")
-            days = int(parts[1])
-            user_id = message.from_user.id
-            payload_user_id = int(parts[2])
-            if days not in PLAN_DAYS or payload_user_id != user_id:
-                raise ValueError("Invalid successful payment payload")
-            
-            # Activate/extend premium
-            new_expiry = await db.set_premium(user_id, days)
-            
-            if new_expiry:
-                _track_payment_success(user_id, payment, days)
-                settings = await get_global_settings()
-                download_benefit = describe_daily_limit(
-                    settings["premium_daily_limit"]
-                )
-                text = f"""
+def _validate_successful_payment(payment, purchase, user_id):
+    expected_stars = purchase.stars
+    charge_id = str(payment.telegram_payment_charge_id).strip()
+    is_valid = (
+        purchase.user_id == user_id
+        and payment.currency == "XTR"
+        and expected_stars is not None
+        and payment.total_amount == expected_stars
+        and bool(charge_id)
+    )
+    if not is_valid:
+        raise ValueError("Invalid successful Telegram Stars payment")
+    return charge_id
+
+
+def _payment_success_text(purchase, activation, download_benefit):
+    return f"""
 🎉 <b>Payment Successful!</b>
 
 ⭐ <b>Premium Activated!</b>
-📅 <b>Duration:</b> {days} day{'s' if days > 1 else ''}
-⏰ <b>Valid Until:</b> {new_expiry.strftime('%d %B %Y, %I:%M %p')}
-💰 <b>Stars Paid:</b> {payment.total_amount} ⭐
+📅 <b>Duration:</b> {purchase.days} day{'s' if purchase.days > 1 else ''}
+⏰ <b>Valid Until:</b> {activation.expires_at.strftime('%d %B %Y, %I:%M %p')}
+💰 <b>Stars Paid:</b> {purchase.stars} ⭐
 
 <b>You now have:</b>
 ✅ {download_benefit}
@@ -241,12 +258,51 @@ async def handle_successful_payment_handler(client, message):
 
 Use /mystatus to check your premium status anytime.
 """
-                await message.reply_text(text)
-                
-                # Log the payment
-                logger.info(f"Premium activated: User {user_id}, {days} days, {payment.total_amount} stars")
-            else:
-                await message.reply_text("❌ Error activating premium. Please contact support.")
+
+
+async def handle_successful_payment_handler(client, message):
+    """Validate and idempotently fulfill a Telegram Stars payment."""
+    try:
+        payment = message.successful_payment
+        purchase = _parse_premium_payload(payment.invoice_payload)
+        user_id = message.from_user.id
+        if purchase.stars is None:
+            settings = await get_global_settings()
+            purchase = PremiumPurchase(
+                purchase.user_id,
+                purchase.days,
+                get_stars_price(settings, purchase.days),
+            )
+        charge_id = _validate_successful_payment(payment, purchase, user_id)
+        activation = await db.activate_star_payment({
+            "telegram_payment_charge_id": charge_id,
+            "provider_payment_charge_id": str(
+                getattr(payment, "provider_payment_charge_id", "") or ""
+            ),
+            "user_id": user_id,
+            "days": purchase.days,
+            "stars": int(payment.total_amount),
+            "currency": str(payment.currency),
+            "invoice_payload": str(payment.invoice_payload),
+        })
+        if activation.was_applied:
+            _track_payment_success(user_id, payment, purchase.days)
+        settings = await get_global_settings()
+        text = _payment_success_text(
+            purchase,
+            activation,
+            describe_daily_limit(settings["premium_daily_limit"]),
+        )
+        await message.reply_text(text)
+        logger.info(
+            "Premium payment fulfilled: user=%s days=%s newly_applied=%s",
+            user_id,
+            purchase.days,
+            activation.was_applied,
+        )
     except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed to process successful premium payment")
-        await message.reply_text("Error processing payment. Please contact support with your payment receipt.")
+        await message.reply_text(
+            "Error processing payment. Please contact support with your "
+            "payment receipt."
+        )
