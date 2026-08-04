@@ -1,173 +1,213 @@
-# EbookGuy Bot — v1.2
+# EbookGuy Filtering Bot
 
-A private Telegram bot for searching, downloading, and converting ebooks and audiobooks with premium monetization via Telegram Stars.
+A private Telegram filtering bot for searching, requesting, downloading, and
+converting ebooks and audiobooks. It includes administrator-controlled runtime
+settings, download limits, Telegram Stars subscriptions, analytics, channel
+indexing, and Docker deployment.
 
-## 📋 Changelog
+## Features
 
-### v1.2
-- **Format Conversion** (Premium): Convert EPUB, PDF, and MOBI files between each other directly in the bot via Calibre. 3 conversions/day for premium users.
-- **Smarter Search**: Progressive word-drop fallback — if a search returns no results, the bot automatically retries with shorter queries.
-- **Live Stats**: `/stats` command tracks total users, library size, and daily downloads in real time.
-- **Codebase Cleanup**: Removed ~280 lines of dead code and 27 unused pip packages. Fixed `/delete` admin command crash.
+### Search and delivery
 
-### v1.1
-- Text-link search results (no inline buttons)
-- Deep link prefix fix
-- Pagination caption cleanup
+- Private-chat ebook and audiobook search
+- Paginated results with configurable result limits and expiry
+- Search suggestions, trending searches, and caption filtering
+- Configurable free and Premium download limits
+- Configurable file-size limits, cooldowns, content protection, and auto-delete
+- Premium EPUB, PDF, and MOBI conversion through Calibre
+- Force-subscription checks for one or more Telegram channels
 
----
+### Administration
 
-## 🚀 Features
+- `/settings` dashboard for limits, channels, search, delivery, requests,
+  Premium, messages, analytics, and operational controls
+- File-channel indexing with checkpoint and resume support
+- File deletion and duplicate detection
+- User broadcasts and direct admin messages
+- Book request workflow with Processing, Uploaded, Already Available, and
+  Unavailable statuses
+- Runtime analytics for users, searches, downloads, requests, conversions, and
+  Telegram Stars payments
 
-### Core
-- **Private bot**: 1-on-1 experience, no group spam
-- **Format selection**: Choose Ebook or Audiobook before searching
-- **Smart search**: Pagination + progressive word-drop fallback for author name queries
-- **Auto-delete**: Configurable delivery deletion policy
-- **Force subscribe**: Require channel membership before access
-- **Trending searches**: `/trending_now` shows configurable recent search trends
+### Payments
 
-### Premium (Telegram Stars ⭐)
-- Configurable free and premium download limits, cooldowns, and file sizes
-- Configurable premium conversion limits — EPUB ↔ PDF ↔ MOBI via Calibre
-- **Telegram Stars payment**: Native in-app, no external gateways
-- **UPI/PayPal support**: External payment option with INR pricing
+- Native Telegram Stars invoices
+- Price, user, currency, and payload validation during checkout
+- Durable, idempotent Premium activation
+- Optional link to an externally hosted payment portal
+- Admin commands for manual Premium activation and transaction inspection
 
-### Admin & Library
-- **Smart indexing**: Index files from channels with checkpoint/resume
-- **Broadcast**: Message all users or groups
-- **Duplicate detection**: Find duplicate files in the database
-- **Multi-client support**: Load balance across multiple bot instances
-- **Request workflow**: Require authors and mark requests Processing, Uploaded,
-  Already Available, or Unavailable
-- **Analytics dashboard**: Period-filtered user, search, download, request, conversion, Premium, and Stars metrics inside `/settings`
+See [PAYMENTS.md](PAYMENTS.md) for the complete payment flow.
 
-### Security & Deployment
-- Docker container runs as non-root user
-- Telegram authorization uses an in-memory session
-- Liveness and readiness endpoints are available at `/health` and `/ready`
-- CI compiles, tests, audits dependencies, rejects credentials, and builds Docker
+## Requirements
 
----
+- Python 3.10
+- MongoDB
+- Telegram API credentials from `my.telegram.org`
+- A bot token from BotFather
+- Calibre and its `ebook-convert` command for format conversion
 
-## 🛠 Configuration
+Docker installs Calibre automatically. Local installations must provide
+`ebook-convert` on `PATH` before conversion can work.
 
-| File | Purpose |
-|------|---------|
-| `.env.example` | Required credentials and runtime configuration |
-| `info.py` | Validated configuration parsing and application defaults |
-| `Script.py` | All user-facing text — edit for tone/language |
+## Configuration
 
-Copy `.env.example` to `.env` for local development. `API_ID`, `API_HASH`,
-`BOT_TOKEN`, `DATABASE_URI`, and `ADMINS` are required. Never commit `.env` or
-Pyrogram `.session` files.
+Copy `.env.example` to `.env` and replace the placeholder values.
 
-### Runtime Settings
+The following variables are required:
 
-Bot administrators can use `/settings` in a private chat to manage Usage,
-Access & Welcome, Channels, Search, Delivery, Requests, Premium, and Bot
-Operation values. File indexing, file deletion, request, index-request, log,
-and support fallback channels can be changed and validated without restarting.
-The dashboard also provides analytics and a confirmed action for resetting all
-current daily download counters. Overrides are stored in MongoDB, audited,
-cached briefly, and applied without a restart. Environment-backed values in
-`info.py` remain the defaults used when no override is stored.
+| Variable | Purpose |
+| --- | --- |
+| `API_ID` | Telegram API application ID |
+| `API_HASH` | Telegram API application hash |
+| `BOT_TOKEN` | BotFather token |
+| `DATABASE_URI` | MongoDB connection string |
+| `ADMINS` | Space-separated Telegram user IDs allowed to administer the bot |
 
-### Code Organization
+Important optional variables include:
 
-- `plugins/` contains Pyrogram handler registration and compatibility exports.
-- `EbookGuy/features/` contains domain behavior for search, filters, downloads, premium, indexing, requests, and administration.
-- `EbookGuy/shared/` contains reusable state, formatting, settings, subscriptions, parsing, broadcast, and delivery helpers.
-- `database/` contains focused collection setup, query modules, and indexing checkpoint persistence.
-- `EbookGuy/util/` contains infrastructure utilities.
+| Variable | Purpose |
+| --- | --- |
+| `LOG_CHANNEL` | Restart, user, and operational log destination |
+| `CHANNELS` | Telegram channels indexed for files |
+| `AUTH_CHANNEL` | Force-subscription channel |
+| `REQST_CHANNEL` | Book request destination |
+| `PAYMENT_WEBSITE` | External payment portal shown alongside Telegram Stars |
+| `PORT` | HTTP health server port, default `8080` |
+| `MULTIPLE_DATABASE` | Enable separate MongoDB connections |
 
-### Premium Pricing
-```python
-FREE_DAILY_LIMIT = 1          # Free downloads per day
-PREMIUM_DAILY_LIMIT = 20      # Premium downloads per day
-PREMIUM_DOWNLOAD_COOLDOWN = 30  # Seconds between downloads
+Use `.env.example` as the complete environment-variable reference. Never commit
+`.env`, MongoDB credentials, bot tokens, or Pyrogram `.session` files.
 
-PREMIUM_PRICES = {
-    30: 100,   # 30 Days — 100 Stars (~$1.99)
-    90: 250,   # 90 Days — 250 Stars (~$4.99)
-}
+Administrators can change most operational values through `/settings`. These
+overrides are stored in MongoDB and take precedence over environment defaults.
 
-PREMIUM_PRICES_INR = {
-    30: 150,   # 30 Days — ₹150
-    90: 350,   # 90 Days — ₹350
-}
+## Local Development
+
+### Windows PowerShell
+
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --requirement requirements.lock
+Copy-Item .env.example .env
+python bot.py
 ```
 
----
-
-## 🐳 Deployment
+### Linux or macOS
 
 ```bash
-# Configure
+python3.10 -m venv .venv
+source .venv/bin/activate
+python -m pip install --requirement requirements.lock
 cp .env.example .env
-
-# Build
-docker build -t ebookguy-bot .
-
-# Run
-docker run -d -p 8080:8080 --env-file .env ebookguy-bot
+python bot.py
 ```
 
-The production image installs `requirements.lock`, runs as a non-root user,
-and reports ready only after Telegram and MongoDB initialization complete.
+The service is ready when `GET /ready` returns HTTP `200`.
 
----
+## Deployment
 
-## 🤖 Commands
+The production image:
 
-### User
+- Uses Python 3.10
+- Installs the exact versions in `requirements.lock`
+- Runs as a non-root user
+- Keeps the Telegram session in memory
+- Exposes liveness and readiness endpoints
+- Stops background tasks and Telegram clients during shutdown
+
+```bash
+docker build -t filtering-bot .
+docker run --detach \
+  --name filtering-bot \
+  --publish 8080:8080 \
+  --env-file .env \
+  filtering-bot
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for production configuration, CI, health
+checks, secret rotation, and the deployment checklist.
+
+## Health Endpoints
+
+| Endpoint | Meaning |
+| --- | --- |
+| `/health` | Process is running |
+| `/ready` | Telegram and required startup initialization completed |
+
+Load balancers and container platforms should use `/ready` for readiness
+checks. The Docker image already defines this health check.
+
+## Commands
+
+### Users
+
 | Command | Description |
-|---------|-------------|
-| `/start` | Start the bot, choose format |
-| `/premium` | View plans and subscribe |
-| `/mystatus` | Check premium status and remaining downloads |
-| `/id` | Get your Telegram ID |
-| `/info` | Get user info |
-| `/request Book title \| Author name` | Submit a book request |
-| `/trending_now` | Show recent trending searches |
+| --- | --- |
+| `/start` | Open the bot and begin searching |
+| `/plan` | View Premium plans and payment methods |
+| `/mystatus` | View Premium status and remaining usage |
+| `/request Title \| Author` | Submit a book request |
+| `/trending_now` | View recent trending searches |
+| `/id` | Display the user's Telegram ID |
+| `/info` | Display Telegram account information |
+| `/alive` | Check whether the bot is running |
+| `/ping` | Measure bot response time |
 
-### Admin
+### Administrators
+
 | Command | Description |
-|---------|-------------|
-| `/stats` | Live stats: users, library, downloads, DB size |
-| `/settings` | Manage global runtime bot settings |
-| `/broadcast` | Broadcast to all users |
-| `/grp_broadcast` | Broadcast to all groups |
-| `/ban` / `/unban` | Manage user access |
-| `/addpremium <id> <days>` | Gift premium |
-| `/removepremium <id>` | Remove premium |
-| `/premiumusers` | List premium subscribers |
-| `/stars` | Bot Star balance |
-| `/starhistory [limit]` | Star transaction history |
-| `/logs` | Recent error logs |
+| --- | --- |
+| `/settings` | Manage global runtime settings and analytics |
+| `/stats` | Display current bot and database statistics |
+| `/broadcast` | Broadcast a replied message to users |
+| `/send` | Send a message to a specific user |
+| `/logs` | Retrieve current runtime logs |
+| `/restart` | Restart the bot process |
+| `/addpremium <user_id> <days>` | Grant or extend Premium manually |
+| `/removepremium <user_id>` | Remove Premium |
+| `/premiumusers` | List Premium users |
+| `/stars` | Display the bot's Telegram Stars balance |
+| `/starhistory [limit]` | Display recorded Stars transactions |
 
-### Indexing
+### File management
+
 | Command | Description |
-|---------|-------------|
-| `/index` | Index files from a channel |
-| `/delete` | Delete a specific file from DB |
-| `/deleteall` | Delete all indexed files |
-| `/deletebyquery` | Delete files matching a query |
-| `/find_duplicates` | Find duplicate files |
+| --- | --- |
+| `/index` | Index messages from a Telegram channel |
+| `/resume` | Resume an interrupted indexing operation |
+| `/setskip` | Configure indexing skip behavior |
+| `/delete` | Delete one indexed file |
+| `/deleteall` | Delete all indexed files after confirmation |
+| `/deletefiles` | Delete files matching the cleanup workflow |
+| `/duplicates` | Find duplicate indexed files |
+| `/channel` | List configured indexed channels |
 
----
+## Project Structure
 
-## 💎 Premium Benefits
+| Path | Responsibility |
+| --- | --- |
+| `plugins/` | Pyrogram handler registration |
+| `EbookGuy/features/` | Search, downloads, requests, Premium, indexing, and admin behavior |
+| `EbookGuy/shared/` | Shared settings, parsing, delivery, analytics, and state |
+| `EbookGuy/bot/` | Telegram client initialization |
+| `EbookGuy/util/` | Infrastructure utilities |
+| `database/` | MongoDB collections and persistence services |
+| `tests/` | Regression tests |
+| `.github/workflows/ci.yml` | Dependency, test, credential, and image checks |
 
-| Feature | Free | Premium |
-|---------|------|---------|
-| Daily downloads | 1/day | 20/day |
-| Download cooldown | — | 30s between downloads |
-| Format conversion | ❌ | ✅ 3/day (EPUB ↔ PDF ↔ MOBI) |
-| File access | All files | All files |
+## Verification
 
----
+```bash
+python -m compileall -q bot.py Script.py utils.py EbookGuy database plugins tests
+python -m unittest discover -s tests -v
+python -m pip check
+```
 
-## 📝 License
+CI additionally audits locked dependencies, rejects tracked credentials, and
+builds the Docker image.
+
+## License
 
 MIT License.
