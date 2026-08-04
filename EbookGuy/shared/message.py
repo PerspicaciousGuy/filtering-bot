@@ -2,10 +2,7 @@ import logging
 from typing import Union
 
 from pyrogram import enums
-from pyrogram.errors import RPCError
 from pyrogram.types import Message
-
-from info import ADMINS
 
 
 def get_file_id(msg: Message):
@@ -53,15 +50,3 @@ def extract_user(message: Message) -> Union[int, str]:
         user_id = message.from_user.id
         user_first_name = message.from_user.first_name
     return (user_id, user_first_name)
-
-
-async def is_admin_or_owner(client, grp_id, user_id):
-    """Check if user is admin, owner, or in ADMINS list"""
-    try:
-        member = await client.get_chat_member(grp_id, user_id)
-        return (
-            member.status in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]
-            or str(user_id) in ADMINS
-        )
-    except RPCError:
-        return str(user_id) in ADMINS

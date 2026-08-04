@@ -10,9 +10,7 @@ from database.ia_filterdb import (
     get_file_details,
 )
 from utils import (
-    get_settings,
     is_subscribed,
-    pub_is_subscribed,
     temp,
 )
 
@@ -61,50 +59,6 @@ async def _handle_file_link(query):
         await query.answer("Unblock the bot mahn !", show_alert=True)
     except (PeerIdInvalid, *CALLBACK_ERRORS):
         await query.answer(url=_file_start_url(prefix, file_id))
-
-
-async def _handle_sendfiles(query):
-    _, key = query.data.split("#")
-    settings = await get_settings(query.message.chat.id)
-    prefix = "allfilesp" if settings["file_secure"] else "allfiles"
-    url = _file_start_url(prefix, key)
-    try:
-        await query.answer(url=url)
-    except UserIsBlocked:
-        await query.answer("Unblock the bot mahn !", show_alert=True)
-    except PeerIdInvalid:
-        await query.answer(url=url)
-    except CALLBACK_ERRORS:
-        logger.exception("Failed to answer sendfiles callback")
-        await query.answer(url=url)
-
-
-async def _handle_unmute(client, query):
-    _, user_id = query.data.split("#")
-    settings = await get_settings(int(query.message.chat.id))
-    if int(user_id) == 0:
-        await query.answer("You are anonymous admin !", show_alert=True)
-        return
-
-    try:
-        button = await pub_is_subscribed(client, query, settings["fsub"])
-        if button:
-            await query.answer(
-                "Kindly Join Given Channel Then Click On Unmute Button",
-                show_alert=True,
-            )
-            return
-        await client.unban_chat_member(
-            query.message.chat.id,
-            query.from_user.id,
-        )
-        await query.answer("Unmuted Successfully !", show_alert=True)
-        try:
-            await query.message.delete()
-        except CALLBACK_ERRORS:
-            return
-    except CALLBACK_ERRORS:
-        await query.answer("Not For Your My Dear", show_alert=True)
 
 
 async def _handle_delete_link(query):
@@ -168,10 +122,6 @@ async def maybe_handle_file_callback(client, query):
     action = query.data.partition("#")[0]
     if action.startswith("file"):
         await _handle_file_link(query)
-    elif action == "sendfiles":
-        await _handle_sendfiles(query)
-    elif action == "unmuteme":
-        await _handle_unmute(client, query)
     elif action == "del":
         await _handle_delete_link(query)
     elif action == "checksub":

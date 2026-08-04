@@ -63,9 +63,7 @@ async def web_server():
 
 
 async def _initialize_bot_state():
-    banned_users, banned_chats = await db.get_banned()
-    temp.BANNED_USERS = banned_users
-    temp.BANNED_CHATS = banned_chats
+    temp.BANNED_USERS = await db.get_banned()
     identity = await EbookGuyBot.get_me()
     temp.BOT = EbookGuyBot
     temp.ME = identity.id

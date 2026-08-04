@@ -6,7 +6,6 @@ import logging
 
 from pyrogram import enums
 from pyrogram.errors import RPCError, UserNotParticipant
-from pyrogram.types import InlineKeyboardButton
 from pymongo.errors import PyMongoError
 
 from database.join_reqs import JoinReqs
@@ -25,21 +24,6 @@ class SubscriptionRequirement:
     channel: int | str
     title: str
     url: str | None
-
-
-async def pub_is_subscribed(bot, query, channel):
-    btn = []
-    for channel_id in channel:
-        chat = await bot.get_chat(int(channel_id))
-        try:
-            await bot.get_chat_member(channel_id, query.from_user.id)
-        except UserNotParticipant:
-            btn.append(
-                [InlineKeyboardButton(f"Join {chat.title}", url=chat.invite_link)]
-            )
-        except RPCError:
-            logger.warning("Failed to check public-channel subscription", exc_info=True)
-    return btn
 
 
 async def _legacy_join_request_exists(user_id: int, channel: int | str) -> bool:
@@ -129,5 +113,4 @@ __all__ = [
     "SubscriptionRequirement",
     "get_missing_subscriptions",
     "is_subscribed",
-    "pub_is_subscribed",
 ]

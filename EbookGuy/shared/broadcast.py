@@ -27,18 +27,3 @@ async def broadcast_messages(user_id, message):
         return False, "Error"
     except RPCError:
         return False, "Error"
-
-
-async def broadcast_messages_group(chat_id, message):
-    try:
-        kd = await message.copy(chat_id=chat_id)
-        try:
-            await kd.pin()
-        except RPCError:
-            logging.getLogger(__name__).debug("Broadcast copy could not be pinned", exc_info=True)
-        return True, "Success"
-    except FloodWait as e:
-        await asyncio.sleep(e.x)
-        return await broadcast_messages_group(chat_id, message)
-    except RPCError:
-        return False, "Error"

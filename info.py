@@ -49,9 +49,9 @@ AUTH_USERS = list(dict.fromkeys(auth_users + ADMINS))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 📢 SECTION 3: CHANNEL & GROUP IDs
+# 📢 SECTION 3: CHANNEL IDS
 # ═══════════════════════════════════════════════════════════════════════════════
-# All your Telegram channel/group IDs in one place
+# All your Telegram channel IDs in one place
 
 # 📋 LOG_CHANNEL: Bot sends new user info here when someone starts the bot
 # For the main bot
@@ -76,7 +76,7 @@ REQST_CHANNEL = parse_optional_identifier(environ.get('REQST_CHANNEL', ''))
 # 📥 INDEX_REQ_CHANNEL: Index requests from users
 INDEX_REQ_CHANNEL = int(environ.get('INDEX_REQ_CHANNEL', LOG_CHANNEL))
 
-# 💬 SUPPORT_CHAT_ID: Support group - bot won't send files here
+# 💬 SUPPORT_CHAT_ID: Support fallback chat
 SUPPORT_CHAT_ID = parse_optional_identifier(
     environ.get('SUPPORT_CHAT_ID', '')
 )
@@ -123,7 +123,6 @@ S_DB_URI = environ.get('S_DB_URI', "")    # File data (secondary - when primary 
 # 🔗 SECTION 6: LINKS & URLs
 # ═══════════════════════════════════════════════════════════════════════════════
 
-GRP_LNK = environ.get('GRP_LNK', 'https://t.me/ebookguy')        # Your group link
 CHNL_LNK = environ.get('CHNL_LNK', 'https://t.me/ebookguy')      # Your channel link
 SUPPORT_CHAT = environ.get('SUPPORT_CHAT', 'codeconvo')          # Support username (without @)
 OWNER_LNK = environ.get('OWNER_LNK', 'https://t.me/ebookguy')    # Owner's profile link
@@ -192,14 +191,10 @@ BINANCE_90_DAYS_USD = environ.get('BINANCE_90_DAYS_USD', '4.99').strip()
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PM_SEARCH = parse_env_bool('PM_SEARCH', True)           # Allow search in private messages
-AUTO_FFILTER = parse_env_bool('AUTO_FFILTER', True)     # Auto-filter in groups
 AUTO_DELETE = parse_env_bool('AUTO_DELETE', True)       # Auto-delete search results after 5 min
 BUTTON_MODE = parse_env_bool('BUTTON_MODE')             # Show files as buttons (False = text-link list, True = inline buttons)
-MAX_BTN = parse_env_bool('MAX_BTN', True)               # Limit buttons per page
 
-MELCOW_NEW_USERS = parse_env_bool('MELCOW_NEW_USERS', True)    # Welcome new users in groups
 PROTECT_CONTENT = parse_env_bool('PROTECT_CONTENT')            # Disable forwarding bot messages
-PUBLIC_FILE_STORE = parse_env_bool('PUBLIC_FILE_STORE')        # Anyone can use file store
 NO_RESULTS_MSG = parse_env_bool("NO_RESULTS_MSG", True)        # Show "no results" message
 USE_CAPTION_FILTER = parse_env_bool('USE_CAPTION_FILTER', True) # Search in file captions too
 
@@ -232,7 +227,6 @@ PING_INTERVAL = int(environ.get("PING_INTERVAL", "1200"))  # Keep-alive ping int
 PORT = int(environ.get("PORT", "8080"))                    # Web server port
 URL = environ.get("URL", "http://localhost:8080/")         # Bot URL
 CACHE_TIME = int(environ.get('CACHE_TIME', '1800'))        # Cache duration (seconds)
-MAX_B_TN = environ.get("MAX_B_TN", "5")                    # Max buttons per row
 MAX_LIST_ELM = environ.get("MAX_LIST_ELM", None)           # Max list elements
 
 

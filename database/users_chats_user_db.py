@@ -63,10 +63,7 @@ class UserRecordsMixin:
 
     async def get_banned(self):
         users = self.col.find({'ban_status.is_banned': True})
-        chats = self.grp.find({'chat_status.is_disabled': True})
-        b_chats = [chat['id'] async for chat in chats]
-        b_users = [user['id'] async for user in users]
-        return b_users, b_chats
+        return [user['id'] async for user in users]
 
     async def get_user(self, user_id):
         user_data = await self.users.find_one({"id": user_id})
