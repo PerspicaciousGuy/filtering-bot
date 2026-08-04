@@ -2,33 +2,32 @@
 
 import logging
 
-from pyrogram.errors import RPCError
 from pymongo.errors import PyMongoError
+from pyrogram.errors import MessageNotModified, RPCError
 
-from info import ADMINS
+from EbookGuy.features.admin.analytics import show_analytics
+from EbookGuy.features.admin.settings_actions import (
+    reset_download_limits,
+    show_download_reset_confirmation,
+)
 from EbookGuy.features.admin.settings_commands import (
     build_category_view,
     build_setting_detail,
     build_settings_dashboard,
 )
 from EbookGuy.features.admin.settings_input import start_setting_input
-from EbookGuy.features.admin.settings_actions import (
-    reset_download_limits,
-    show_download_reset_confirmation,
-)
-from EbookGuy.features.admin.analytics import show_analytics
 from EbookGuy.shared.global_settings import (
     get_global_settings,
     reset_global_setting,
     save_global_setting,
 )
-from EbookGuy.shared.settings_catalog import CATEGORY_LABELS, SETTING_LABELS
+from EbookGuy.shared.settings_catalog import CATEGORY_LABELS
 from EbookGuy.shared.settings_schema import (
     is_boolean_setting,
     is_editable_setting,
     is_known_setting,
 )
-
+from info import ADMINS
 
 logger = logging.getLogger(__name__)
 ACCESS_DENIED_MESSAGE = "Only bot admins can use these settings."
@@ -54,9 +53,9 @@ async def _show_setting(query, key: str) -> None:
     if not is_known_setting(key):
         await query.answer("Unknown setting.", show_alert=True)
         return
+    await query.answer()
     settings = await get_global_settings()
     text, markup = build_setting_detail(key, settings)
-    await query.answer()
     await query.message.edit_text(text, reply_markup=markup)
 
 
@@ -72,12 +71,11 @@ async def _set_boolean_value(query, payload: str) -> None:
         await query.answer("Unknown setting value.", show_alert=True)
         return
     value = raw_value == "1"
+    await query.answer()
     settings = await get_global_settings()
     await save_global_setting(key, value, query.from_user.id)
     settings[key] = value
     text, markup = build_setting_detail(key, settings)
-    state = "Enabled" if value else "Disabled"
-    await query.answer(f"{SETTING_LABELS[key]}: {state}")
     await query.message.edit_text(text, reply_markup=markup)
 
 
@@ -85,11 +83,10 @@ async def _reset_setting(query, key: str) -> None:
     if not is_editable_setting(key) or is_boolean_setting(key):
         await query.answer("This setting cannot be reset here.", show_alert=True)
         return
-    previous, default = await reset_global_setting(key, query.from_user.id)
+    await query.answer()
+    await reset_global_setting(key, query.from_user.id)
     settings = await get_global_settings()
     text, markup = build_setting_detail(key, settings)
-    notice = "Already using the default" if previous == default else "Default restored"
-    await query.answer(notice)
     await query.message.edit_text(text, reply_markup=markup)
 
 
@@ -142,6 +139,8 @@ async def handle_settings_callback(client, query) -> None:
             await query.answer("Settings are temporarily unavailable.", show_alert=True)
         except RPCError:
             logger.exception("Failed to send the global settings database error")
+    except MessageNotModified:
+        logger.debug("Global settings view is already current")
     except RPCError:
         logger.exception("Failed to navigate global settings")
 
