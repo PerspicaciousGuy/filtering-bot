@@ -176,10 +176,15 @@ PAYMENT_WEBSITE = environ.get('PAYMENT_WEBSITE', '').strip()  # External payment
 
 # Payment method details (provide your external payment pages/links)
 PAYPAL_ID = environ.get('PAYPAL_ID', 'paypal.me/yourname')           # PayPal.me link
-UPI_ID = environ.get('UPI_ID', 'your-upi-id')                        # Your UPI ID (e.g., name@bank)
+UPI_ID = environ.get('UPI_ID', '').strip()                           # Your UPI ID (e.g., name@bank)
+UPI_PAYEE_NAME = environ.get('UPI_PAYEE_NAME', '').strip()
 CRYPTO_WALLET = environ.get('CRYPTO_WALLET', '')                     # USDT/Bitcoin address
 CRYPTO_TYPE = environ.get('CRYPTO_TYPE', 'usdt')                     # usdt or bitcoin
-BINANCE_PAY_ID = environ.get('BINANCE_PAY_ID', '')                   # Binance Pay ID
+BINANCE_PAY_ID = environ.get('BINANCE_PAY_ID', '').strip()           # Binance Pay ID
+BINANCE_PAY_URL_30 = environ.get('BINANCE_PAY_URL_30', '').strip()
+BINANCE_PAY_URL_90 = environ.get('BINANCE_PAY_URL_90', '').strip()
+BINANCE_30_DAYS_USD = environ.get('BINANCE_30_DAYS_USD', '1.99').strip()
+BINANCE_90_DAYS_USD = environ.get('BINANCE_90_DAYS_USD', '4.99').strip()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -214,12 +219,8 @@ ALLOWED_EXTENSIONS = EBOOK_EXTENSIONS + AUDIOBOOK_EXTENSIONS
 # Start message picture(s) - space-separated for multiple
 PICS = (environ.get('PICS', 'https://files.catbox.moe/xmntht.png')).split()
 
-# Bot reactions when user starts
-REACTIONS = ["🤝", "😇", "🤗", "😍", "👍", "🎅", "😐", "🥰", "🤩", "😱", "🤣", "😘", "👏", "😛", "😈", "🎉", "⚡️", "🫡", "🤓", "😎", "🏆", "🔥", "🤭", "🌚", "🆒", "👻", "😁"]
-
 # Captions for files
 CUSTOM_FILE_CAPTION = environ.get("CUSTOM_FILE_CAPTION", f"{script.CAPTION}")
-MSG_ALRT = environ.get('MSG_ALRT', 'Hello My Dear Friends ❤️')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
