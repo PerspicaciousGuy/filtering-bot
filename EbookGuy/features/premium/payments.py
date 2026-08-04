@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 
+from pymongo.errors import PyMongoError
 from pyrogram.errors import MessageNotModified, RPCError
 from pyrogram.types import (
     InlineKeyboardButton,
@@ -8,17 +9,17 @@ from pyrogram.types import (
     LabeledPrice,
     PreCheckoutQuery,
 )
-from pymongo.errors import PyMongoError
+
 from database.users_chats_db import db
-from EbookGuy.shared.global_settings import (
-    describe_daily_limit,
-    get_global_settings,
-)
-from EbookGuy.shared.analytics import track_event
 from EbookGuy.features.premium.plans import (
     PLAN_DAYS,
     get_inr_price,
     get_stars_price,
+)
+from EbookGuy.shared.analytics import track_event
+from EbookGuy.shared.global_settings import (
+    describe_daily_limit,
+    get_global_settings,
 )
 from info import PAYMENT_WEBSITE
 
@@ -112,6 +113,8 @@ def _payment_method_buttons(days, settings):
     ]
     if not settings["stars_payments_enabled"]:
         buttons.pop(0)
+    if not PAYMENT_WEBSITE.startswith(("https://", "http://")):
+        buttons.pop(-2)
     return buttons
 
 
