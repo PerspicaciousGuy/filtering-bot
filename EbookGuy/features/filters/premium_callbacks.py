@@ -1,3 +1,7 @@
+from EbookGuy.features.premium.manual_payments import (
+    handle_manual_paid_callback,
+    handle_manual_payment_callback,
+)
 from EbookGuy.features.premium.payments import (
     handle_buy_premium_callback,
     handle_confirm_premium_callback,
@@ -16,6 +20,12 @@ async def maybe_handle_premium_callback(client, query):
         return True
     if query.data.startswith("confirm_premium_"):
         await handle_confirm_premium_callback(client, query)
+        return True
+    if query.data.startswith("manual_payment_"):
+        await handle_manual_payment_callback(client, query)
+        return True
+    if query.data.startswith("manual_paid_"):
+        await handle_manual_paid_callback(client, query)
         return True
     if query.data.startswith("payment_method_") or query.data in LEGACY_PAYMENT_CALLBACKS:
         await query.answer(

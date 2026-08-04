@@ -186,6 +186,6 @@ async def start():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(start())
+        EbookGuyBot.run(start())
     except KeyboardInterrupt:
         logger.info("Service stopped")

@@ -20,6 +20,10 @@ from EbookGuy.features.premium.payments import (
     handle_pre_checkout_handler,
     handle_successful_payment_handler,
 )
+from EbookGuy.features.premium.support import (
+    handle_payment_support_command,
+    handle_terms_command,
+)
 from EbookGuy.features.premium.views import (
     handle_my_status_command,
     handle_premium_command,
@@ -42,6 +46,16 @@ async def premium_command(client, message):
 @Client.on_message(filters.command("mystatus") & filters.private, group=-1)
 async def my_status_command(client, message):
     await handle_my_status_command(client, message)
+
+
+@Client.on_message(filters.command("terms") & filters.private, group=-1)
+async def terms_command(client, message):
+    await handle_terms_command(client, message)
+
+
+@Client.on_message(filters.command("paysupport") & filters.private, group=-1)
+async def payment_support_command(client, message):
+    await handle_payment_support_command(client, message)
 
 
 @Client.on_callback_query(filters.regex(r"^show_premium$"))

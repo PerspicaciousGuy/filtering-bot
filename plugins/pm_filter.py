@@ -16,7 +16,12 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
 
-@Client.on_message(filters.private & filters.text & filters.incoming)
+@Client.on_message(
+    filters.private
+    & filters.text
+    & filters.incoming
+    & filters.regex(r"^[^/#]")
+)
 async def pm_text(bot, message):
     if is_settings_input_active(message.from_user.id):
         return

@@ -1,12 +1,12 @@
 import logging
 from dataclasses import dataclass
 
+from aiohttp import ClientError, ClientSession, ClientTimeout
 from pymongo.errors import PyMongoError
 from pyrogram.errors import MessageNotModified, RPCError
 from pyrogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    LabeledPrice,
     PreCheckoutQuery,
 )
 
@@ -25,11 +25,16 @@ from EbookGuy.shared.global_settings import (
     describe_daily_limit,
     get_global_settings,
 )
-from info import PAYMENT_WEBSITE
+from info import BOT_TOKEN, PAYMENT_WEBSITE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 last_invoice_messages = {}
+STARS_INVOICE_TIMEOUT_SECONDS = 15
+
+
+class StarsInvoiceError(RuntimeError):
+    """Raised when Telegram rejects or cannot create a Stars invoice."""
 
 
 @dataclass(frozen=True)
@@ -87,23 +92,47 @@ async def _clear_previous_invoice(client, query, user_id):
         logger.debug("Payment confirmation was already unavailable", exc_info=True)
 
 
-async def _send_premium_invoice(client, invoice):
-    return await client.send_invoice(
-        chat_id=invoice.user_id,
-        title=f"Premium - {invoice.days} Days",
-        description=(
+async def _send_premium_invoice(invoice):
+    request = {
+        "chat_id": invoice.user_id,
+        "title": f"Premium - {invoice.days} Days",
+        "description": (
             f"Get {invoice.days} days of Premium access with "
             f"{invoice.download_benefit}. Existing Premium is extended."
         ),
-        payload=(
+        "payload": (
             f"premium_{invoice.days}_{invoice.user_id}_{invoice.stars}"
         ),
-        currency="XTR",
-        prices=[LabeledPrice(
-            label=f"{invoice.days} Days Premium",
-            amount=invoice.stars,
-        )],
-    )
+        "provider_token": "",
+        "currency": "XTR",
+        "prices": [{
+            "label": f"{invoice.days} Days Premium",
+            "amount": invoice.stars,
+        }],
+    }
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice"
+    timeout = ClientTimeout(total=STARS_INVOICE_TIMEOUT_SECONDS)
+    try:
+        async with ClientSession(timeout=timeout) as session:
+            async with session.post(url, json=request) as response:
+                result = await response.json(content_type=None)
+    except (ClientError, TypeError, ValueError):
+        raise StarsInvoiceError(
+            "Telegram Bot API invoice request failed"
+        ) from None
+
+    if not result.get("ok"):
+        error_code = result.get("error_code", "unknown")
+        description = result.get("description", "unknown error")
+        raise StarsInvoiceError(
+            f"Telegram rejected Stars invoice: {error_code} {description}"
+        )
+    try:
+        return int(result["result"]["message_id"])
+    except (KeyError, TypeError, ValueError):
+        raise StarsInvoiceError(
+            "Telegram returned an invalid Stars invoice response"
+        ) from None
 
 
 def _payment_method_buttons(days, settings):
@@ -214,10 +243,17 @@ async def handle_confirm_premium_callback(client, query):
     await _clear_previous_invoice(client, query, user_id)
     invoice = PremiumInvoice(user_id, days, stars, download_benefit)
     try:
-        invoice_msg = await _send_premium_invoice(client, invoice)
-        last_invoice_messages[user_id] = invoice_msg.id
+        invoice_message_id = await _send_premium_invoice(invoice)
+        last_invoice_messages[user_id] = invoice_message_id
         await query.answer()
-    except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
+    except (
+        KeyError,
+        PyMongoError,
+        RPCError,
+        StarsInvoiceError,
+        TypeError,
+        ValueError,
+    ):
         logger.exception("Failed to create Telegram Stars invoice")
         await query.answer(
             "Error creating payment. Please try again later.",
