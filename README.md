@@ -44,7 +44,9 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 
 ### Security & Deployment
 - Docker container runs as non-root user
-- Koyeb/Heroku/Docker ready
+- Telegram authorization uses an in-memory session
+- Liveness and readiness endpoints are available at `/health` and `/ready`
+- CI compiles, tests, audits dependencies, rejects credentials, and builds Docker
 
 ---
 
@@ -52,8 +54,13 @@ A private Telegram bot for searching, downloading, and converting ebooks and aud
 
 | File | Purpose |
 |------|---------|
-| `info.py` | API keys, DB URLs, channel IDs, pricing |
+| `.env.example` | Required credentials and runtime configuration |
+| `info.py` | Validated configuration parsing and application defaults |
 | `Script.py` | All user-facing text — edit for tone/language |
+
+Copy `.env.example` to `.env` for local development. `API_ID`, `API_HASH`,
+`BOT_TOKEN`, `DATABASE_URI`, and `ADMINS` are required. Never commit `.env` or
+Pyrogram `.session` files.
 
 ### Runtime Settings
 
@@ -63,8 +70,8 @@ Operation values. File indexing, file deletion, request, index-request, log,
 and support fallback channels can be changed and validated without restarting.
 The dashboard also provides analytics and a confirmed action for resetting all
 current daily download counters. Overrides are stored in MongoDB, audited,
-cached briefly, and applied without a restart. Values in `info.py` remain the
-defaults used when no override is stored.
+cached briefly, and applied without a restart. Environment-backed values in
+`info.py` remain the defaults used when no override is stored.
 
 ### Code Organization
 
@@ -72,7 +79,7 @@ defaults used when no override is stored.
 - `EbookGuy/features/` contains domain behavior for search, filters, downloads, premium, indexing, requests, and administration.
 - `EbookGuy/shared/` contains reusable state, formatting, settings, subscriptions, parsing, broadcast, and delivery helpers.
 - `database/` contains focused collection setup, query modules, and indexing checkpoint persistence.
-- `EbookGuy/util/` contains infrastructure utilities; the custom streaming/template subsystem is retained but currently has no active route.
+- `EbookGuy/util/` contains infrastructure utilities.
 
 ### Premium Pricing
 ```python
@@ -96,12 +103,18 @@ PREMIUM_PRICES_INR = {
 ## 🐳 Deployment
 
 ```bash
+# Configure
+cp .env.example .env
+
 # Build
 docker build -t ebookguy-bot .
 
 # Run
 docker run -d -p 8080:8080 --env-file .env ebookguy-bot
 ```
+
+The production image installs `requirements.lock`, runs as a non-root user,
+and reports ready only after Telegram and MongoDB initialization complete.
 
 ---
 

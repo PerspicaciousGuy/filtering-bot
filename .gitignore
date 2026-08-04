@@ -4,7 +4,12 @@
 *.log
 TELEGRAM BOT.LOG
 .env
+.env.*
+!.env.example
+*.session
+*.session-journal
 venv/
+.venv/
 .vscode/
 AGENTS.md
 agents-guidelines/

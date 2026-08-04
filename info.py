@@ -1,8 +1,16 @@
-import re
 from os import environ
-from Script import script 
 
-id_pattern = re.compile(r'^.\d+$')
+from EbookGuy.shared.environment import (
+    load_and_validate_environment,
+    parse_identifiers,
+    parse_optional_identifier,
+    required_int_environment,
+)
+from Script import script
+
+load_and_validate_environment(
+    ("API_ID", "API_HASH", "BOT_TOKEN", "DATABASE_URI", "ADMINS")
+)
 
 
 def parse_env_bool(name: str, default: bool = False) -> bool:
@@ -25,9 +33,9 @@ def parse_env_bool(name: str, default: bool = False) -> bool:
 # Get these from https://my.telegram.org/apps
 
 SESSION = environ.get('SESSION', 'EbookGuyBot')          # Session name for the bot
-API_ID = int(environ.get('API_ID', ''))                  # Your Telegram API ID
-API_HASH = environ.get('API_HASH', '')                   # Your Telegram API Hash
-BOT_TOKEN = environ.get('BOT_TOKEN', "")                 # Bot token from @BotFather
+API_ID = required_int_environment('API_ID')              # Your Telegram API ID
+API_HASH = environ['API_HASH'].strip()                   # Your Telegram API Hash
+BOT_TOKEN = environ['BOT_TOKEN'].strip()                 # Bot token from @BotFather
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -35,9 +43,9 @@ BOT_TOKEN = environ.get('BOT_TOKEN', "")                 # Bot token from @BotFa
 # ═══════════════════════════════════════════════════════════════════════════════
 # Who can control the bot? Add Telegram user IDs (space-separated for multiple)
 
-ADMINS = [int(admin) if id_pattern.search(admin) else admin for admin in environ.get('ADMINS', '5850899264').split()]
-auth_users = [int(user) if id_pattern.search(user) else user for user in environ.get('AUTH_USERS', '5850899264').split()]
-AUTH_USERS = (auth_users + ADMINS) if auth_users else []
+ADMINS = parse_identifiers(environ['ADMINS'])
+auth_users = parse_identifiers(environ.get('AUTH_USERS', ''))
+AUTH_USERS = list(dict.fromkeys(auth_users + ADMINS))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -47,38 +55,37 @@ AUTH_USERS = (auth_users + ADMINS) if auth_users else []
 
 # 📋 LOG_CHANNEL: Bot sends new user info here when someone starts the bot
 # For the main bot
-LOG_CHANNEL = int(environ.get('LOG_CHANNEL', '-1002145018097'))
+LOG_CHANNEL = int(environ.get('LOG_CHANNEL', '0') or 0)
 
 # For test bot
 #LOG_CHANNEL = int(environ.get('LOG_CHANNEL', '-1002458827148'))
 
 # 📁 CHANNELS: Upload files here → Bot auto-saves to database (main file storage)
 # For the main bot
-CHANNELS = [int(ch) if id_pattern.search(ch) else ch for ch in environ.get('CHANNELS', '-1002042914531').split()]
+CHANNELS = parse_identifiers(environ.get('CHANNELS', ''))
 
 # For test bot
 #CHANNELS = [int(ch) if id_pattern.search(ch) else ch for ch in environ.get('CHANNELS', '-1002393037732').split()]
 
 # 🔒 AUTH_CHANNEL: Force subscribe channel - users must join to use bot
-auth_channel = environ.get('AUTH_CHANNEL', '-1002181641962')
-AUTH_CHANNEL = int(auth_channel) if auth_channel and id_pattern.search(auth_channel) else None
+AUTH_CHANNEL = parse_optional_identifier(environ.get('AUTH_CHANNEL', ''))
 
 # 📝 REQST_CHANNEL: User book requests go here (via /request or #request)
-reqst_channel = environ.get('REQST_CHANNEL', '-1002447612109')
-REQST_CHANNEL = int(reqst_channel) if reqst_channel and id_pattern.search(reqst_channel) else None
+REQST_CHANNEL = parse_optional_identifier(environ.get('REQST_CHANNEL', ''))
 
 # 📥 INDEX_REQ_CHANNEL: Index requests from users
 INDEX_REQ_CHANNEL = int(environ.get('INDEX_REQ_CHANNEL', LOG_CHANNEL))
 
 # 💬 SUPPORT_CHAT_ID: Support group - bot won't send files here
-support_chat_id = environ.get('SUPPORT_CHAT_ID', '')
-SUPPORT_CHAT_ID = int(support_chat_id) if support_chat_id and id_pattern.search(support_chat_id) else None
+SUPPORT_CHAT_ID = parse_optional_identifier(
+    environ.get('SUPPORT_CHAT_ID', '')
+)
 
 
 
 # 🗑️ DELETE_CHANNELS: Forward files here to delete them from database
 # For the main bot
-DELETE_CHANNELS = [int(dch) if id_pattern.search(dch) else dch for dch in environ.get('DELETE_CHANNELS', '-1002418225707').split()]
+DELETE_CHANNELS = parse_identifiers(environ.get('DELETE_CHANNELS', ''))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -97,12 +104,14 @@ TRY_AGAIN_BTN = parse_env_bool('TRY_AGAIN_BTN')
 # 🗄️ SECTION 5: DATABASE (MongoDB)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-DATABASE_URI = environ.get('DATABASE_URI', "")           # Main MongoDB connection string
+DATABASE_URI = environ['DATABASE_URI'].strip()           # Main MongoDB connection string
 DATABASE_NAME = environ.get('DATABASE_NAME', "booksnew") # Database name
 COLLECTION_NAME = environ.get('COLLECTION_NAME', 'ebookguy')  # Collection for files
 
 # Multiple Database Support (for large file collections)
 MULTIPLE_DATABASE = parse_env_bool('MULTIPLE_DATABASE')
+if MULTIPLE_DATABASE:
+    load_and_validate_environment(("O_DB_URI", "F_DB_URI", "S_DB_URI"))
 
 # Only needed if MULTIPLE_DATABASE = True
 O_DB_URI = environ.get('O_DB_URI', "")    # Other data (users, settings)
@@ -142,9 +151,9 @@ START_BUTTONS = [
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Free user daily download limit
-FREE_DAILY_LIMIT = int(environ.get('FREE_DAILY_LIMIT', 2))
-PREMIUM_DAILY_LIMIT = int(environ.get('PREMIUM_DAILY_LIMIT', 20))
-PREMIUM_DOWNLOAD_COOLDOWN = int(environ.get('PREMIUM_DOWNLOAD_COOLDOWN', 30))  # seconds between downloads
+FREE_DAILY_LIMIT = int(environ.get('FREE_DAILY_LIMIT', '2'))
+PREMIUM_DAILY_LIMIT = int(environ.get('PREMIUM_DAILY_LIMIT', '20'))
+PREMIUM_DOWNLOAD_COOLDOWN = int(environ.get('PREMIUM_DOWNLOAD_COOLDOWN', '30'))  # seconds between downloads
 
 # Premium pricing in Telegram Stars (2-tier pricing)
 PREMIUM_PRICES = {
@@ -163,7 +172,7 @@ PREMIUM_PRICES_INR = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Payment website for users to select payment method
-PAYMENT_WEBSITE = environ.get('PAYMENT_WEBSITE', 'https://ebookguy.vercel.app/')  # Website with payment methods
+PAYMENT_WEBSITE = environ.get('PAYMENT_WEBSITE', '').strip()  # External payment portal
 
 # Payment method details (provide your external payment pages/links)
 PAYPAL_ID = environ.get('PAYPAL_ID', 'paypal.me/yourname')           # PayPal.me link
@@ -221,7 +230,7 @@ ON_HEROKU = 'DYNO' in environ                              # Auto-detect Heroku 
 PING_INTERVAL = int(environ.get("PING_INTERVAL", "1200"))  # Keep-alive ping interval (seconds)
 PORT = int(environ.get("PORT", "8080"))                    # Web server port
 URL = environ.get("URL", "http://localhost:8080/")         # Bot URL
-CACHE_TIME = int(environ.get('CACHE_TIME', 1800))          # Cache duration (seconds)
+CACHE_TIME = int(environ.get('CACHE_TIME', '1800'))        # Cache duration (seconds)
 MAX_B_TN = environ.get("MAX_B_TN", "5")                    # Max buttons per row
 MAX_LIST_ELM = environ.get("MAX_LIST_ELM", None)           # Max list elements
 
