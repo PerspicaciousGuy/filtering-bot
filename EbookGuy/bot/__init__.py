@@ -1,8 +1,9 @@
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import AsyncGenerator
 
 from pyrogram import Client
 from pyrogram.types import Message
+
 from info import API_HASH, API_ID, BOT_TOKEN, SESSION
 from utils import temp
 
@@ -25,6 +26,7 @@ class EbookGuyXBot(Client):
             workers=150,
             plugins={"root": "plugins"},
             sleep_threshold=5,
+            in_memory=True,
         )
 
     async def set_self(self):
