@@ -51,7 +51,14 @@ class PremiumPayloadTests(unittest.TestCase):
     def test_hides_unconfigured_external_payment_portal(self):
         settings = {"stars_payments_enabled": True}
 
-        with patch.object(payments, "PAYMENT_WEBSITE", ""):
+        with (
+            patch.object(payments, "PAYMENT_WEBSITE", ""),
+            patch.object(
+                payments,
+                "manual_payment_method_buttons",
+                return_value=[],
+            ),
+        ):
             buttons = payments._payment_method_buttons(30, settings)
 
         self.assertEqual(len(buttons), 2)
