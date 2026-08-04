@@ -11,7 +11,6 @@ from database.connections_mdb import (
     make_active,
     make_inactive,
 )
-from info import MSG_ALRT
 
 
 logger = logging.getLogger(__name__)
@@ -135,5 +134,5 @@ async def maybe_handle_connection_callback(client, query):
         await handlers[action](client, query)
     else:
         return False
-    await query.answer(MSG_ALRT)
+    await query.answer()
     return True

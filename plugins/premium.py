@@ -3,14 +3,16 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import PreCheckoutQuery
 
-from info import ADMINS
-from EbookGuy.shared.callback_metrics import measure_callback
 from EbookGuy.features.premium.admin import (
     handle_add_premium_command,
     handle_premium_users_command,
     handle_remove_premium_command,
     handle_stars_balance_command,
     handle_stars_history_command,
+)
+from EbookGuy.features.premium.manual_payments import (
+    handle_manual_paid_callback,
+    handle_manual_payment_callback,
 )
 from EbookGuy.features.premium.payments import (
     handle_buy_premium_callback,
@@ -23,6 +25,8 @@ from EbookGuy.features.premium.views import (
     handle_premium_command,
     handle_show_premium_callback,
 )
+from EbookGuy.shared.callback_metrics import measure_callback
+from info import ADMINS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -50,6 +54,22 @@ async def show_premium_callback(client, query):
 @measure_callback("buy_premium")
 async def buy_premium_callback(client, query):
     await handle_buy_premium_callback(client, query)
+
+
+@Client.on_callback_query(
+    filters.regex(r"^manual_payment_(upi|binance)_(30|90)$")
+)
+@measure_callback("manual_payment")
+async def manual_payment_callback(client, query):
+    await handle_manual_payment_callback(client, query)
+
+
+@Client.on_callback_query(
+    filters.regex(r"^manual_paid_(upi|binance)_(30|90)$")
+)
+@measure_callback("manual_paid")
+async def manual_paid_callback(client, query):
+    await handle_manual_paid_callback(client, query)
 
 
 @Client.on_callback_query(filters.regex(r"^confirm_premium_(\d+)$"))

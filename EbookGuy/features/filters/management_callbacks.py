@@ -6,7 +6,7 @@ from pyrogram.errors import RPCError
 from database.connections_mdb import active_connection
 from database.filters_mdb import del_all
 from database.gfilters_mdb import del_allg
-from info import ADMINS, MSG_ALRT
+from info import ADMINS
 
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ async def _resolve_group(client, query):
     if chat_type in GROUP_TYPES:
         return query.message.chat.id, query.message.chat.title
     if chat_type != enums.ChatType.PRIVATE:
-        await query.answer(MSG_ALRT)
+        await query.answer()
         return None
 
     group_id = await active_connection(str(query.from_user.id))
@@ -38,7 +38,7 @@ async def _resolve_group(client, query):
             "I'm not connected to any groups!\n"
             "Check /connections or connect to any groups"
         )
-        await query.answer(MSG_ALRT)
+        await query.answer()
         return None
     try:
         chat = await client.get_chat(group_id)
@@ -46,7 +46,7 @@ async def _resolve_group(client, query):
         await query.message.edit_text(
             "Make sure I'm present in your group!!"
         )
-        await query.answer(MSG_ALRT)
+        await query.answer()
         return None
     return group_id, chat.title
 

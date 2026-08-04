@@ -11,6 +11,10 @@ from pyrogram.types import (
 )
 
 from database.users_chats_db import db
+from EbookGuy.features.premium.manual_payment_options import (
+    manual_payment_method_buttons,
+    manual_payment_method_names,
+)
 from EbookGuy.features.premium.plans import (
     PLAN_DAYS,
     get_inr_price,
@@ -103,23 +107,61 @@ async def _send_premium_invoice(client, invoice):
 
 
 def _payment_method_buttons(days, settings):
-    buttons = [
-        [InlineKeyboardButton(
-            "⭐ Pay with Telegram Stars",
-            callback_data=f"confirm_premium_{days}",
-        )],
-        [InlineKeyboardButton("💳 Go to Payment Portal", url=PAYMENT_WEBSITE)],
-        [InlineKeyboardButton("« Back to Plans", callback_data="show_premium")],
-    ]
-    if not settings["stars_payments_enabled"]:
-        buttons.pop(0)
-    if not PAYMENT_WEBSITE.startswith(("https://", "http://")):
-        buttons.pop(-2)
+    buttons = []
+    if settings["stars_payments_enabled"]:
+        buttons.append([
+            InlineKeyboardButton(
+                "⭐ Pay with Telegram Stars",
+                callback_data=f"confirm_premium_{days}",
+            )
+        ])
+    manual_buttons = manual_payment_method_buttons(days, settings)
+    buttons.extend(manual_buttons)
+    if (
+        not manual_buttons
+        and PAYMENT_WEBSITE.startswith(("https://", "http://"))
+    ):
+        buttons.append([
+            InlineKeyboardButton(
+                "Open Payment Portal",
+                url=PAYMENT_WEBSITE,
+            )
+        ])
+    buttons.append([
+        InlineKeyboardButton(
+            "Back to Plans",
+            callback_data="show_premium",
+        )
+    ])
     return buttons
 
 
+def _payment_method_text(days, stars, inr_price, settings):
+    manual_methods = manual_payment_method_names(days, settings)
+    methods = []
+    if settings["stars_payments_enabled"]:
+        methods.append(
+            f"Telegram Stars - {stars} Stars, activated instantly"
+        )
+    methods.extend(manual_methods)
+    if (
+        not manual_methods
+        and PAYMENT_WEBSITE.startswith(("https://", "http://"))
+    ):
+        methods.append("External payment portal - manual verification")
+    method_text = "\n".join(f"• {method}" for method in methods)
+    return (
+        "<b>Complete Your Payment</b>\n\n"
+        f"<b>Selected plan:</b> {days} days Premium\n"
+        f"<b>Telegram Stars:</b> {stars}\n"
+        f"<b>UPI price:</b> INR {inr_price}\n\n"
+        "<b>Choose a payment method:</b>\n"
+        f"{method_text}"
+    )
+
+
 async def handle_buy_premium_callback(client, query):
-    """Handle premium purchase button click - show payment method options"""
+    """Show available payment methods for the selected Premium plan."""
     days = int(query.data.split("_")[2])
     settings = await get_global_settings()
     if not settings["premium_purchases_enabled"]:
@@ -129,38 +171,17 @@ async def handle_buy_premium_callback(client, query):
         )
         return
     stars = get_stars_price(settings, days)
-    
+
     if not stars:
         return await query.answer("Invalid plan!", show_alert=True)
-    
-    # Get INR price if available
+
     inr_price = get_inr_price(settings, days)
-    plan_name = f"{days} Day" if days == 7 else f"{days} Day{'s' if days > 1 else ''}"
-    stars_method = (
-        "⭐ <b>Telegram Stars</b> - Instant payment within the bot"
-        if settings["stars_payments_enabled"]
-        else "Telegram Stars payments are temporarily unavailable."
-    )
-    
-    text = f"""
-<b>💳 Complete Your Payment</b>
-
-📦 <b>Selected Plan:</b> {plan_name} Premium
-⭐ <b>Price:</b> {stars} Telegram Stars (~${stars/100:.2f})
-💰 <b>INR Price:</b> ₹{inr_price}
-
-<b>Choose your preferred payment method:</b>
-
-{stars_method}
-💳 <b>Other Methods</b> - UPI, Crypto, Binance Pay on our portal
-"""
-    
     buttons = _payment_method_buttons(days, settings)
     try:
         await query.message.edit_text(
-            text,
+            _payment_method_text(days, stars, inr_price, settings),
             reply_markup=InlineKeyboardMarkup(buttons),
-            disable_web_page_preview=True
+            disable_web_page_preview=True,
         )
     except MessageNotModified:
         logger.debug("Premium view is already current")
