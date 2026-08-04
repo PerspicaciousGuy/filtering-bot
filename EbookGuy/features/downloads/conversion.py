@@ -1,7 +1,10 @@
 import asyncio
 import logging
 import os
+import shutil
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
 from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -32,6 +35,7 @@ class ConversionRequest:
     file_id: str
     source_format: str
     target_format: str
+    work_dir: str
     input_path: str
     output_path: str
     clean_title: str
@@ -66,10 +70,15 @@ async def _run_conversion(input_path, output_path):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    await asyncio.wait_for(
-        process.communicate(),
-        timeout=CONVERSION_TIMEOUT_SECONDS,
-    )
+    try:
+        await asyncio.wait_for(
+            process.communicate(),
+            timeout=CONVERSION_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.communicate()
+        raise
     return os.path.exists(output_path)
 
 
@@ -203,13 +212,24 @@ async def _load_conversion(query):
             show_alert=True,
         )
         return None
+    if (
+        target_format not in CONVERTIBLE_FORMATS
+        or target_format == source_format
+    ):
+        await query.answer(
+            "Invalid conversion format.",
+            show_alert=True,
+        )
+        return None
+    work_dir = tempfile.mkdtemp(prefix="ebookguy-conversion-")
     return ConversionRequest(
         user_id=query.from_user.id,
         file_id=file_id,
         source_format=source_format,
         target_format=target_format,
-        input_path=f"/tmp/{file_id}.{source_format}",
-        output_path=f"/tmp/{file_id}.{target_format}",
+        work_dir=work_dir,
+        input_path=str(Path(work_dir) / f"input.{source_format}"),
+        output_path=str(Path(work_dir) / f"output.{target_format}"),
         clean_title=_clean_title(file["file_name"]),
     )
 
@@ -279,12 +299,12 @@ async def handle_do_convert_callback(client, query):
     conversion = await _load_conversion(query)
     if conversion is None:
         return
-    await query.message.edit_text(
-        f"\u23f3 <b>Converting {conversion.source_format.upper()} "
-        f"\u2192 {conversion.target_format.upper()}...</b>\n\n"
-        "This may take up to 30 seconds."
-    )
     try:
+        await query.message.edit_text(
+            f"\u23f3 <b>Converting {conversion.source_format.upper()} "
+            f"\u2192 {conversion.target_format.upper()}...</b>\n\n"
+            "This may take up to 30 seconds."
+        )
         await client.download_media(
             conversion.file_id,
             file_name=conversion.input_path,
@@ -313,9 +333,7 @@ async def handle_do_convert_callback(client, query):
             "<b>Conversion failed.</b> Please try again later."
         )
     finally:
-        for path in (conversion.input_path, conversion.output_path):
-            if os.path.exists(path):
-                os.remove(path)
+        shutil.rmtree(conversion.work_dir, ignore_errors=True)
 
 
 async def handle_convert_back_callback(client, query):
