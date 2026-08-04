@@ -1,21 +1,23 @@
 # Payments and Premium
 
-The bot supports native Telegram Stars purchases and an optional link to an
-external payment portal. Telegram Stars purchases are fulfilled automatically.
-Payments made through an external portal require a separate verification
-process and manual Premium activation.
+The bot supports native Telegram Stars purchases, Google Pay / UPI payment
+details, direct Binance Pay links, and an optional external payment portal
+fallback. Telegram Stars purchases are fulfilled automatically. Manual and
+portal payments require verification and Premium activation.
 
 ## User Flow
 
 1. The user sends `/plan`.
 2. The bot displays the configured 30-day and 90-day plans.
 3. The user selects a plan.
-4. The bot displays available payment methods.
+4. The bot displays configured payment methods.
 5. Telegram Stars opens a native Telegram invoice.
-6. A configured external portal opens in the user's browser.
+6. Google Pay / UPI displays the configured payment details.
+7. Binance Pay opens the configured HTTPS payment link.
+8. `I Have Paid` displays proof submission instructions.
 
-The external portal button appears only when `PAYMENT_WEBSITE` starts with
-`https://` or `http://`.
+If no direct manual method is configured, the external portal button appears
+when `PAYMENT_WEBSITE` starts with `https://` or `http://`.
 
 ## Telegram Stars Flow
 
@@ -58,7 +60,54 @@ After Telegram reports a successful charge, the bot:
 The Telegram payment charge ID is the idempotency key. Reprocessing the same
 successful-payment update does not extend Premium twice.
 
-## External Payment Portal
+## Google Pay and UPI
+
+The bot builds a UPI payment URI from the selected plan's INR price:
+
+```dotenv
+UPI_ID=merchant@bank
+UPI_PAYEE_NAME=Example Merchant
+```
+
+Telegram rejects direct `upi://` inline button URLs as an unsupported protocol.
+The bot catches that response, removes the Pay button, and shows the UPI ID and
+amount for manual entry. A one-tap UPI action requires an HTTPS page that opens
+the UPI URI after a user click.
+
+The 30-day and 90-day INR amounts are controlled through `/settings`.
+
+## Binance Pay
+
+Configure one HTTPS payment link per plan:
+
+```dotenv
+BINANCE_PAY_ID=123456789
+BINANCE_PAY_URL_30=https://s.binance.com/example30
+BINANCE_PAY_URL_90=https://s.binance.com/example90
+BINANCE_30_DAYS_USD=1.99
+BINANCE_90_DAYS_USD=4.99
+```
+
+The displayed USD amounts are informational and must match the corresponding
+Binance payment links.
+
+## Manual Verification
+
+After paying through UPI or Binance Pay, the user selects `I Have Paid`. The
+bot displays the method, plan, amount, Telegram user ID, and a link to the
+configured support destination.
+
+An administrator must verify the provider transaction before using:
+
+```text
+/addpremium <user_id> <days>
+```
+
+Do not grant Premium from a screenshot alone. Verify the transaction in the
+payment provider's own dashboard and ensure a transaction ID has not been
+reused.
+
+## External Payment Portal Fallback
 
 Set:
 
@@ -66,9 +115,9 @@ Set:
 PAYMENT_WEBSITE=https://payments.example.com/
 ```
 
-The bot does not collect, verify, or fulfill UPI, Google Pay, PayPal, Binance,
-crypto, or card payments itself. Those methods may be displayed and processed
-by the configured external website.
+The portal is shown only when no direct UPI or Binance method is available.
+The bot does not automatically verify or fulfill payments completed through
+the portal.
 
 After independently verifying an external payment, an administrator can grant
 Premium manually:
@@ -82,9 +131,6 @@ Example:
 ```text
 /addpremium 123456789 30
 ```
-
-Do not grant Premium from a screenshot alone. Verify the transaction in the
-payment provider's own dashboard.
 
 ## Runtime Settings
 
@@ -112,13 +158,19 @@ Settings stored through `/settings` apply without restarting the bot.
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `PAYMENT_WEBSITE` | No | Optional external portal URL |
+| `UPI_ID` | No | UPI virtual payment address |
+| `UPI_PAYEE_NAME` | No | Payee name included in the UPI link |
+| `BINANCE_PAY_ID` | No | Binance Pay recipient ID shown to users |
+| `BINANCE_PAY_URL_30` | No | Binance HTTPS link for 30 days |
+| `BINANCE_PAY_URL_90` | No | Binance HTTPS link for 90 days |
+| `BINANCE_30_DAYS_USD` | No | Display amount for the 30-day link |
+| `BINANCE_90_DAYS_USD` | No | Display amount for the 90-day link |
 | `BOT_TOKEN` | Yes | Required for Telegram invoices and bot operation |
 | `DATABASE_URI` | Yes | Stores users, Premium state, and payment records |
 | `ADMINS` | Yes | Controls access to Premium administration commands |
 
-Legacy environment values such as `PAYPAL_ID`, `UPI_ID`, `CRYPTO_WALLET`, and
-`BINANCE_PAY_ID` are not used by the current in-bot payment flow. Configure
-those payment details on the external portal instead.
+Legacy values such as `PAYPAL_ID` and `CRYPTO_WALLET` are not used by the
+current in-bot payment flow.
 
 ## User Commands
 
@@ -182,6 +234,10 @@ Automated tests cover:
 - Successful-payment amount validation
 - Idempotent Premium fulfillment
 - External portal button visibility
+- UPI URI amount and payee construction
+- Binance plan-to-link mapping
+- Invalid Binance link rejection
+- Direct UPI button rejection fallback
 
 Run:
 
@@ -198,7 +254,9 @@ Before production release, manually test:
 - Repeated successful-payment delivery
 - `/mystatus` after payment
 - Purchase and Stars feature toggles
-- External portal shown and hidden states
+- UPI and Binance Pay detail pages
+- Direct UPI behavior on Android, iOS, and Telegram Desktop
+- External portal fallback shown and hidden states
 - Manual Premium activation
 
 ## Troubleshooting
@@ -215,6 +273,23 @@ a non-zero Stars price.
 ### External portal button is missing
 
 Set `PAYMENT_WEBSITE` to a complete URL beginning with `https://` or `http://`.
+
+The portal is intentionally hidden when a direct UPI or Binance method is
+configured.
+
+### Google Pay button is missing
+
+Set both `UPI_ID` and `UPI_PAYEE_NAME`, and configure a non-zero INR plan price
+through `/settings`.
+
+### Direct UPI button is unavailable
+
+Telegram rejected the `upi://` URL. Copy the displayed UPI ID and amount into
+the payment app, or use an HTTPS redirect page for cross-client support.
+
+### Binance Pay button is missing
+
+Set the matching plan URL to a complete `https://` or `http://` URL.
 
 ### Checkout says the payment request is invalid
 

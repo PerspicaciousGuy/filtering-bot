@@ -34,7 +34,10 @@ indexing, and Docker deployment.
 - Native Telegram Stars invoices
 - Price, user, currency, and payload validation during checkout
 - Durable, idempotent Premium activation
-- Optional link to an externally hosted payment portal
+- Google Pay / UPI details with a safe unsupported-link fallback
+- Direct Binance Pay links
+- Manual proof instructions for externally completed payments
+- Optional external payment portal fallback
 - Admin commands for manual Premium activation and transaction inspection
 
 See [PAYMENTS.md](PAYMENTS.md) for the complete payment flow.
