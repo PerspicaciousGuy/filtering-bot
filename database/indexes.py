@@ -1,13 +1,19 @@
 """Indexes required by high-frequency bot operations."""
 
 import asyncio
+import logging
 from dataclasses import dataclass
+
+from pymongo.errors import DuplicateKeyError
 
 from database.file_collections import (
     active_file_collections,
     checkpoint_col,
 )
 from database.users_chats_db import db
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -25,11 +31,23 @@ async def _ensure_index(requirement):
     for existing_name, details in existing_indexes.items():
         if tuple(details["key"]) == requirement.keys:
             return existing_name
-    return await requirement.collection.create_index(
-        list(requirement.keys),
-        unique=requirement.is_unique,
-        name=requirement.name,
-    )
+    try:
+        return await requirement.collection.create_index(
+            list(requirement.keys),
+            unique=requirement.is_unique,
+            name=requirement.name,
+        )
+    except DuplicateKeyError:
+        if not requirement.is_unique:
+            raise
+        logger.warning(
+            "Duplicate records prevent unique index %s; using lookup index",
+            requirement.name,
+        )
+        return await requirement.collection.create_index(
+            list(requirement.keys),
+            name=f"{requirement.name}_fallback",
+        )
 
 
 async def ensure_core_indexes():
@@ -38,8 +56,7 @@ async def ensure_core_indexes():
         IndexRequirement(
             db.col,
             (("id", 1),),
-            "user_id_unique",
-            is_unique=True,
+            "user_id_lookup",
         ),
         IndexRequirement(
             checkpoint_col,
