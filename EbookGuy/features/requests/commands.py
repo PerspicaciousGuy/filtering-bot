@@ -28,6 +28,7 @@ AUTHOR_REQUIRED_MESSAGE = (
     "Include the author using this format:\n"
     "<code>/request Book title | Author name</code>"
 )
+MISSING_AUTHOR_KEY = "Not provided"
 FORWARD_ERROR_MESSAGE = (
     "Something went wrong while sending your request. Please try again later."
 )
@@ -91,11 +92,15 @@ def _request_text(submission, includes_reporter_id):
         reporter = f"{reporter_name} ({message.from_user.id})"
     else:
         reporter = reporter_name
-    return (
+    text = (
         f"<b>Reporter :</b> <code>{reporter}</code>\n\n"
-        f"<b>Book:</b> <code>{escape(submission.title)}</code>\n"
-        f"<b>Author:</b> <code>{escape(submission.author)}</code>"
+        f"<b>Book:</b> <code>{escape(submission.title)}</code>"
     )
+    if submission.author:
+        text += (
+            f"\n<b>Author:</b> <code>{escape(submission.author)}</code>"
+        )
+    return text
 
 
 async def _forward_request(submission):
@@ -165,7 +170,7 @@ def _parse_request_content(content, is_author_required):
         raise ValueError(EMPTY_REQUEST_MESSAGE)
     if is_author_required and (not separator or len(author) < 2):
         raise ValueError(AUTHOR_REQUIRED_MESSAGE)
-    return title, author or "Not provided"
+    return title, author
 
 
 async def _request_denial(submission):
@@ -279,7 +284,9 @@ async def handle_requests(bot, message):
         bot=bot,
         message=message,
         content=content,
-        normalized_content=_normalize_request(f"{title} | {author}"),
+        normalized_content=_normalize_request(
+            f"{title} | {author or MISSING_AUTHOR_KEY}"
+        ),
         settings=settings,
         request_id=request_id,
         title=title,

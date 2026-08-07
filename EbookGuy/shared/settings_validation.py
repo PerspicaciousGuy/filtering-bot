@@ -18,10 +18,15 @@ REQUEST_TEMPLATE_FIELDS = {
     "user_name",
     "book_title",
     "author_name",
+    "book_with_author",
     "request_id",
     "reason",
     "download_link",
 }
+REQUEST_TEMPLATE_HINT = (
+    "Available fields: {user_name}, {book_with_author}, {book_title}, "
+    "{author_name}, {request_id}, {reason}, and {download_link}."
+)
 WELCOME_TEMPLATE_FIELDS = {
     "first_name",
     "username",
@@ -158,37 +163,25 @@ SETTING_RULES = {
         "kind": "message_template",
         "maximum_length": 3500,
         "fields": REQUEST_TEMPLATE_FIELDS,
-        "hint": (
-            "Available fields: {user_name}, {book_title}, {author_name}, "
-            "{request_id}, {reason}, and {download_link}."
-        ),
+        "hint": REQUEST_TEMPLATE_HINT,
     },
     "request_unavailable_message": {
         "kind": "message_template",
         "maximum_length": 3500,
         "fields": REQUEST_TEMPLATE_FIELDS,
-        "hint": (
-            "Available fields: {user_name}, {book_title}, {author_name}, "
-            "{request_id}, {reason}, and {download_link}."
-        ),
+        "hint": REQUEST_TEMPLATE_HINT,
     },
     "request_uploaded_message": {
         "kind": "message_template",
         "maximum_length": 3500,
         "fields": REQUEST_TEMPLATE_FIELDS,
-        "hint": (
-            "Available fields: {user_name}, {book_title}, {author_name}, "
-            "{request_id}, {reason}, and {download_link}."
-        ),
+        "hint": REQUEST_TEMPLATE_HINT,
     },
     "request_already_available_message": {
         "kind": "message_template",
         "maximum_length": 3500,
         "fields": REQUEST_TEMPLATE_FIELDS,
-        "hint": (
-            "Available fields: {user_name}, {book_title}, {author_name}, "
-            "{request_id}, {reason}, and {download_link}."
-        ),
+        "hint": REQUEST_TEMPLATE_HINT,
     },
     "premium_purchases_enabled": {"kind": "boolean"},
     "stars_payments_enabled": {"kind": "boolean"},

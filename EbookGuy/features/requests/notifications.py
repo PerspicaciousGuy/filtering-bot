@@ -96,6 +96,7 @@ ALERT_ACTIONS = {
 }
 
 AVAILABLE_STATUS_KEYS = {"uploaded", "already_available"}
+MISSING_AUTHOR_VALUES = {"", "not provided"}
 
 
 async def _request_channel_link(client, channel_id: int) -> str:
@@ -145,14 +146,34 @@ async def _notification_markup(notification: RequestNotification):
 
 
 def _template_values(user, record, request_id: str | None) -> dict[str, str]:
+    title = str((record or {}).get("title", "your book")).strip()
+    author = str((record or {}).get("author", "")).strip()
+    if author.casefold() in MISSING_AUTHOR_VALUES:
+        author = ""
+    book_with_author = f"{title} by {author}" if author else title
     return {
         "user_name": escape(user.first_name or "Reader"),
-        "book_title": escape(str((record or {}).get("title", "your book"))),
-        "author_name": escape(str((record or {}).get("author", "Not provided"))),
+        "book_title": escape(title),
+        "author_name": escape(author),
+        "book_with_author": escape(book_with_author),
         "request_id": escape(request_id or "legacy"),
         "reason": "Not provided",
         "download_link": "Open the bot and search for the book now.",
     }
+
+
+def _normalize_legacy_template(template, has_author):
+    if has_author:
+        return template
+    replacements = {
+        "<b>{book_title}</b> by <b>{author_name}</b>": (
+            "<b>{book_with_author}</b>"
+        ),
+        "{book_title} by {author_name}": "{book_with_author}",
+    }
+    for old_value, new_value in replacements.items():
+        template = template.replace(old_value, new_value)
+    return template
 
 
 async def notify_requester(notification: RequestNotification) -> None:
@@ -162,9 +183,12 @@ async def notify_requester(notification: RequestNotification) -> None:
         record = await db.get_request_record(notification.request_id)
     user = await notification.client.get_users(notification.user_id)
     template = str(notification.settings[notification.status.template_setting])
-    text = template.format(
-        **_template_values(user, record, notification.request_id)
+    values = _template_values(user, record, notification.request_id)
+    template = _normalize_legacy_template(
+        template,
+        bool(values["author_name"]),
     )
+    text = template.format(**values)
     reply_markup = await _notification_markup(notification)
     try:
         await notification.client.send_message(

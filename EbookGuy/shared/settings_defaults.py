@@ -34,22 +34,22 @@ Use /plan for Premium access or visit {support_url} for support."""
 
 DEFAULT_REQUEST_PROCESSING_MESSAGE = """<b>Hello {user_name},</b>
 
-Your request for <b>{book_title}</b> by <b>{author_name}</b> is now processing.
+Your request for <b>{book_with_author}</b> is now processing.
 We will notify you when its availability is confirmed."""
 
 DEFAULT_REQUEST_UNAVAILABLE_MESSAGE = """<b>Hello {user_name},</b>
 
-Your request for <b>{book_title}</b> by <b>{author_name}</b> is unavailable.
+Your request for <b>{book_with_author}</b> is unavailable.
 <b>Reason:</b> {reason}"""
 
 DEFAULT_REQUEST_UPLOADED_MESSAGE = """<b>Hello {user_name},</b>
 
-Your request for <b>{book_title}</b> by <b>{author_name}</b> has been uploaded.
+Your request for <b>{book_with_author}</b> has been uploaded.
 {download_link}"""
 
 DEFAULT_REQUEST_ALREADY_AVAILABLE_MESSAGE = """<b>Hello {user_name},</b>
 
-Your request for <b>{book_title}</b> by <b>{author_name}</b> is already available.
+Your request for <b>{book_with_author}</b> is already available.
 {download_link}"""
 
 LEGACY_GLOBAL_SETTING_ALIASES = {

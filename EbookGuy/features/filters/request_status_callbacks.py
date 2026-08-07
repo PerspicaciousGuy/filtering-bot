@@ -86,8 +86,16 @@ def _request_message_text(message) -> str:
     text = message.text or ""
     status_marker = "\n\nStatus:"
     if status_marker in text:
-        return text.rsplit(status_marker, 1)[0]
-    return text
+        text = text.rsplit(status_marker, 1)[0]
+    visible_lines = []
+    for line in text.splitlines():
+        normalized_line = line.strip().casefold()
+        if normalized_line.startswith("request id:"):
+            continue
+        if normalized_line == "author: not provided":
+            continue
+        visible_lines.append(line)
+    return "\n".join(visible_lines)
 
 
 def _status_markup(
