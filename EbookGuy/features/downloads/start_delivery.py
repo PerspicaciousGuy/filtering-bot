@@ -8,13 +8,15 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from Script import script
 from database.ia_filterdb import get_file_details
+from EbookGuy.features.downloads.auto_delete import (
+    auto_delete_notice,
+    schedule_delivered_messages_deletion,
+    send_auto_delete_message,
+)
 from EbookGuy.features.downloads.callbacks import get_file_again_markup
 from EbookGuy.features.downloads.limits import (
-    auto_delete_notice,
     check_and_increment_download,
-    delete_delivered_messages,
     download_count_text,
-    send_auto_delete_message,
     send_download_limit_message,
 )
 from EbookGuy.shared.formatting import format_file_caption
@@ -117,12 +119,17 @@ async def _send_legacy_file(client, message, payload):
             int(settings["auto_delete_delay_seconds"])
         )
     count_message = await sent.reply(count_text)
-    was_deleted = await delete_delivered_messages((sent,), settings)
-    if not was_deleted:
-        return
-    await count_message.edit_text(
-        script.FILE_DELETED_BTN,
-        reply_markup=get_file_again_markup(file_id),
+
+    async def replace_count_message():
+        await count_message.edit_text(
+            script.FILE_DELETED_BTN,
+            reply_markup=get_file_again_markup(file_id),
+        )
+
+    schedule_delivered_messages_deletion(
+        (sent,),
+        settings,
+        after_delete=replace_count_message,
     )
 
 

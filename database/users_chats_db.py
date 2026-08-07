@@ -1,12 +1,11 @@
-import motor.motor_asyncio
-
-from info import DATABASE_NAME, USER_DB_URI
 from database.analytics_db import AnalyticsMixin
 from database.global_settings_db import GlobalSettingsMixin
+from database.mongo import get_mongo_client
 from database.request_records_db import RequestRecordsMixin
 from database.star_payments_db import StarPaymentsMixin
 from database.users_chats_premium_db import PremiumUsageMixin
 from database.users_chats_user_db import UserRecordsMixin
+from info import DATABASE_NAME, USER_DB_URI
 
 
 class Database(
@@ -18,7 +17,7 @@ class Database(
     GlobalSettingsMixin,
 ):
     def __init__(self, uri, database_name):
-        self._client = motor.motor_asyncio.AsyncIOMotorClient(uri)
+        self._client = get_mongo_client(uri)
         self.db = self._client[database_name]
         self.col = self.db.users
         self.users = self.db.uersz

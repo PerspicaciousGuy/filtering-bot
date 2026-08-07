@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import weakref
 from dataclasses import dataclass
 from html import escape
 
@@ -30,7 +31,16 @@ AUTHOR_REQUIRED_MESSAGE = (
 FORWARD_ERROR_MESSAGE = (
     "Something went wrong while sending your request. Please try again later."
 )
-_request_lock = asyncio.Lock()
+_USER_REQUEST_LOCKS = weakref.WeakValueDictionary()
+_CONTENT_REQUEST_LOCKS = weakref.WeakValueDictionary()
+
+
+def _request_lock(lock_registry, key):
+    lock = lock_registry.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        lock_registry[key] = lock
+    return lock
 
 
 def _utc_now():
@@ -203,7 +213,15 @@ def _request_record(submission, reported_post):
 
 
 async def _submit_request(submission):
-    async with _request_lock:
+    user_lock = _request_lock(
+        _USER_REQUEST_LOCKS,
+        submission.message.from_user.id,
+    )
+    content_lock = _request_lock(
+        _CONTENT_REQUEST_LOCKS,
+        submission.normalized_content,
+    )
+    async with user_lock, content_lock:
         denial = await _request_denial(submission)
         if denial:
             await submission.message.reply_text(denial)

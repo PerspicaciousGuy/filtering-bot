@@ -225,6 +225,7 @@ CUSTOM_FILE_CAPTION = environ.get("CUSTOM_FILE_CAPTION", f"{script.CAPTION}")
 ON_HEROKU = 'DYNO' in environ                              # Auto-detect Heroku deployment
 PING_INTERVAL = int(environ.get("PING_INTERVAL", "1200"))  # Keep-alive ping interval (seconds)
 PORT = int(environ.get("PORT", "8080"))                    # Web server port
+BOT_WORKERS = int(environ.get("BOT_WORKERS", "32"))        # Pyrogram handler workers
 URL = environ.get("URL", "http://localhost:8080/")         # Bot URL
 CACHE_TIME = int(environ.get('CACHE_TIME', '1800'))        # Cache duration (seconds)
 MAX_LIST_ELM = environ.get("MAX_LIST_ELM", None)           # Max list elements

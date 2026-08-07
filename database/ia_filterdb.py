@@ -6,9 +6,13 @@ import re
 from struct import pack
 from pyrogram.file_id import FileId
 from pymongo.errors import DuplicateKeyError, PyMongoError
-from database.file_collections import col, sec_col
+from database.file_collections import active_file_collections, col, sec_col
 from database import indexing_checkpoints as checkpoint_store
-from database.search_repository import SearchRequest, get_search_results
+from database.search_repository import (
+    SearchRequest,
+    clear_search_cache,
+    get_search_results,
+)
 from info import (
     ALLOWED_EXTENSIONS,
     FILTER_BY_EXTENSION,
@@ -41,6 +45,7 @@ async def save_file(media):
 
     try:
         await col.insert_one(file)
+        clear_search_cache()
         logger.info("%s is successfully saved", file_name)
         return True, 1
     except DuplicateKeyError:
@@ -50,6 +55,7 @@ async def save_file(media):
         if MULTIPLE_DATABASE:
             try:
                 await sec_col.insert_one(file)
+                clear_search_cache()
                 logger.info("%s is successfully saved", file_name)
                 return True, 1
             except DuplicateKeyError:
@@ -71,9 +77,10 @@ def clean_file_name(file_name):
 
 
 async def _delete_from_file_collections(method_name, query):
-    for collection in (col, sec_col):
+    for collection in active_file_collections():
         result = await getattr(collection, method_name)(query)
         if result.deleted_count:
+            clear_search_cache()
             return result.deleted_count
     return 0
 
@@ -111,7 +118,7 @@ async def is_file_already_saved(file_id, file_name):
     found1 = {'file_name': file_name}
     found = {'file_id': file_id}
 
-    for collection in [col, sec_col]:
+    for collection in active_file_collections():
         if await collection.find_one(found1) or await collection.find_one(found):
             logger.info("%s is already saved", file_name)
             return True
@@ -138,17 +145,20 @@ async def get_bad_files(query, file_type=None, use_filter=False):
     if USE_CAPTION_FILTER:
         filter_criteria = {'$or': [filter_criteria, {'caption': regex}]}
 
-    total_results = await col.count_documents(filter_criteria)
-    files = await col.find(filter_criteria).to_list(length=None)
-    if MULTIPLE_DATABASE:
-        total_results += await sec_col.count_documents(filter_criteria)
-        files.extend(await sec_col.find(filter_criteria).to_list(length=None))
+    total_results = 0
+    files = []
+    for collection in active_file_collections():
+        total_results += await collection.count_documents(filter_criteria)
+        files.extend(await collection.find(filter_criteria).to_list(length=None))
 
     return files, total_results
 
 async def get_file_details(query):
-    file = await col.find_one({'file_id': query})
-    return file or await sec_col.find_one({'file_id': query})
+    for collection in active_file_collections():
+        file = await collection.find_one({'file_id': query})
+        if file:
+            return file
+    return None
 
 def encode_file_id(s: bytes) -> str:
     r = b""

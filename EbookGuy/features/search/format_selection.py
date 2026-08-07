@@ -1,3 +1,5 @@
+import asyncio
+
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from EbookGuy.features.search.expiry import SearchExpiry, schedule_search_expiry
@@ -61,7 +63,13 @@ async def handle_format_selection(bot, query):
     
     # Update the message to show searching
     format_label = "📖 Ebooks" if format_type == "ebook" else "🎧 Audiobooks" if format_type == "audiobook" else "📚 All Formats"
-    await query.message.edit_text(f"<b><i>Searching For {pending['query']} ({format_label}) 🔍</i></b>")
+    await asyncio.gather(
+        query.answer(),
+        query.message.edit_text(
+            f"<b><i>Searching For {pending['query']} "
+            f"({format_label}) 🔍</i></b>"
+        ),
+    )
     
     # Create mock message using the top-level MockMessage class
     mock_msg = MockMessage(query, pending)
@@ -91,7 +99,13 @@ async def handle_switch_format(bot, query):
     
     # Update the message to show searching
     format_label = "📖 Ebooks" if format_type == "ebook" else "🎧 Audiobooks" if format_type == "audiobook" else "📚 All Formats"
-    await query.message.edit_text(f"<b><i>Searching For {pending['query']} ({format_label}) 🔍</i></b>")
+    await asyncio.gather(
+        query.answer(),
+        query.message.edit_text(
+            f"<b><i>Searching For {pending['query']} "
+            f"({format_label}) 🔍</i></b>"
+        ),
+    )
     
     # Create mock message using the top-level MockMessage class
     mock_msg = MockMessage(query, pending)

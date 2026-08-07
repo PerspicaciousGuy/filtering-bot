@@ -10,10 +10,12 @@ from pymongo.errors import PyMongoError
 from pyrogram import idle
 from pyrogram.errors import RPCError
 
-from database.ia_filterdb import col, sec_col
+from database.file_collections import active_file_collections
+from database.indexes import ensure_core_indexes
 from database.users_chats_db import db
 from EbookGuy.bot import EbookGuyBot, multi_clients, work_loads
 from EbookGuy.bot.clients import initialize_clients
+from EbookGuy.features.downloads.auto_delete import cancel_auto_delete_tasks
 from EbookGuy.features.premium.expiry_notifications import (
     run_premium_expiry_notifier,
 )
@@ -74,10 +76,11 @@ async def _initialize_bot_state():
 async def _refresh_library_count():
     while True:
         try:
-            total = (
-                await col.count_documents({})
-                + await sec_col.count_documents({})
-            )
+            counts = await asyncio.gather(*(
+                collection.estimated_document_count()
+                for collection in active_file_collections()
+            ))
+            total = sum(counts)
             temp.LIB_COUNT = (
                 f"{total // 1000}K" if total >= 1000 else str(total)
             )
@@ -143,7 +146,7 @@ async def _stop_clients():
             continue
         try:
             await client.stop()
-        except RPCError:
+        except (ConnectionError, RPCError):
             logger.exception("Failed to stop Telegram client cleanly")
     multi_clients.clear()
     work_loads.clear()
@@ -155,9 +158,12 @@ async def start():
     background_tasks = []
     try:
         await EbookGuyBot.start()
-        await initialize_clients()
         runner = await web_server()
-        await _initialize_bot_state()
+        await asyncio.gather(
+            initialize_clients(),
+            ensure_core_indexes(),
+            _initialize_bot_state(),
+        )
         background_tasks.extend([
             asyncio.create_task(
                 _refresh_library_count(),
@@ -179,6 +185,7 @@ async def start():
     finally:
         service_state.is_ready = False
         await _cancel_background_tasks(background_tasks)
+        await cancel_auto_delete_tasks()
         if runner is not None:
             await runner.cleanup()
         await _stop_clients()

@@ -2,11 +2,13 @@ from Script import script
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.ia_filterdb import get_file_details
+from EbookGuy.features.downloads.auto_delete import (
+    auto_delete_notice,
+    schedule_delivered_messages_deletion,
+)
 from EbookGuy.features.downloads.limits import (
     answer_download_limit_callback,
-    auto_delete_notice,
     check_and_increment_download,
-    delete_delivered_messages,
     download_count_text,
 )
 from EbookGuy.shared.formatting import format_file_caption
@@ -39,6 +41,7 @@ async def handle_download_book_callback(client, query):
     file = await get_file_details(file_id)
     if not file:
         return await query.answer("File not found.", show_alert=True)
+    await query.answer()
     access = await check_and_increment_download(user_id, file["file_size"])
     if not access.is_allowed:
         await answer_download_limit_callback(query, access)
@@ -64,10 +67,15 @@ async def handle_download_book_callback(client, query):
             int(settings["auto_delete_delay_seconds"])
         )
     count_message = await message.reply(count_text)
-    was_deleted = await delete_delivered_messages((message,), settings)
-    if not was_deleted:
-        return
-    await count_message.edit_text(
-        script.FILE_DELETED_BTN,
-        reply_markup=get_file_again_markup(file_id),
+
+    async def replace_count_message():
+        await count_message.edit_text(
+            script.FILE_DELETED_BTN,
+            reply_markup=get_file_again_markup(file_id),
+        )
+
+    schedule_delivered_messages_deletion(
+        (message,),
+        settings,
+        after_delete=replace_count_message,
     )

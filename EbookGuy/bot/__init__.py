@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pyrogram import Client
 from pyrogram.types import Message
 
-from info import API_HASH, API_ID, BOT_TOKEN, SESSION
+from info import API_HASH, API_ID, BOT_TOKEN, BOT_WORKERS, SESSION
 from utils import temp
 
 
@@ -23,7 +23,7 @@ class EbookGuyXBot(Client):
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
-            workers=150,
+            workers=BOT_WORKERS,
             plugins={"root": "plugins"},
             sleep_threshold=5,
         )

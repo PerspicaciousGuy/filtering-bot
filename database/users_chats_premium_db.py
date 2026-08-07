@@ -1,6 +1,15 @@
 import datetime
 
 
+DOWNLOAD_USAGE_FIELDS = (
+    "is_premium",
+    "premium_expiry",
+    "last_download_date",
+    "daily_downloads",
+    "last_download_time",
+)
+
+
 class PremiumUsageMixin:
     async def ensure_premium_expiry_index(self):
         """Create the index used by the premium expiry worker."""
@@ -51,6 +60,36 @@ class PremiumUsageMixin:
                 return False, premium_expiry
         
         return is_premium, premium_expiry
+
+    async def get_download_profile(self, user_id):
+        """Load only the fields needed to evaluate one download."""
+        projection = {field: 1 for field in DOWNLOAD_USAGE_FIELDS}
+        return await self.col.find_one(
+            {'id': int(user_id)},
+            projection,
+        )
+
+    async def ensure_download_user(self, user_id):
+        """Ensure an allowance record exists for legacy entry points."""
+        await self.col.update_one(
+            {'id': int(user_id)},
+            {'$setOnInsert': {'id': int(user_id)}},
+            upsert=True,
+        )
+
+    async def try_update_download_usage(self, profile, updates):
+        """Apply a usage decision only if its source snapshot is unchanged."""
+        query = {'_id': profile['_id']}
+        for field in DOWNLOAD_USAGE_FIELDS:
+            if field in profile:
+                query[field] = profile[field]
+            else:
+                query[field] = {'$exists': False}
+        result = await self.col.update_one(
+            query,
+            {'$set': updates},
+        )
+        return result.modified_count == 1
 
     async def set_premium(self, user_id, days):
         """Set or extend premium for a user"""

@@ -1,8 +1,10 @@
 """Telegram channel subscription checks shared by user-facing features."""
 
 import asyncio
-from dataclasses import dataclass
 import logging
+import time
+from collections import OrderedDict
+from dataclasses import dataclass
 
 from pyrogram import enums
 from pyrogram.errors import RPCError, UserNotParticipant
@@ -14,7 +16,10 @@ from info import AUTH_CHANNEL, REQUEST_TO_JOIN_MODE
 
 
 logger = logging.getLogger(__name__)
-join_db = JoinReqs
+join_db = JoinReqs()
+MEMBERSHIP_CACHE_TTL_SECONDS = 60
+MEMBERSHIP_CACHE_MAX_ENTRIES = 4096
+_MEMBERSHIP_CACHE = OrderedDict()
 
 
 @dataclass(frozen=True)
@@ -29,10 +34,10 @@ class SubscriptionRequirement:
 async def _legacy_join_request_exists(user_id: int, channel: int | str) -> bool:
     if not REQUEST_TO_JOIN_MODE or channel != AUTH_CHANNEL:
         return False
-    if not join_db().isActive():
+    if not join_db.isActive():
         return False
     try:
-        user = await join_db().get_user(user_id)
+        user = await join_db.get_user(user_id)
     except PyMongoError:
         logger.exception("Failed to check force-subscription join request")
         return False
@@ -40,7 +45,16 @@ async def _legacy_join_request_exists(user_id: int, channel: int | str) -> bool:
 
 
 async def _is_channel_member(bot, user_id: int, channel: int | str) -> bool:
+    cache_key = (user_id, str(channel))
+    expires_at = _MEMBERSHIP_CACHE.get(cache_key)
+    if expires_at is not None:
+        if expires_at > time.monotonic():
+            _MEMBERSHIP_CACHE.move_to_end(cache_key)
+            return True
+        _MEMBERSHIP_CACHE.pop(cache_key, None)
+
     if await _legacy_join_request_exists(user_id, channel):
+        _cache_membership(cache_key)
         return True
     try:
         member = await bot.get_chat_member(channel, user_id)
@@ -49,7 +63,19 @@ async def _is_channel_member(bot, user_id: int, channel: int | str) -> bool:
     except RPCError:
         logger.exception("Failed to check subscription for channel %s", channel)
         return False
-    return member.status != enums.ChatMemberStatus.BANNED
+    is_member = member.status != enums.ChatMemberStatus.BANNED
+    if is_member:
+        _cache_membership(cache_key)
+    return is_member
+
+
+def _cache_membership(cache_key):
+    _MEMBERSHIP_CACHE[cache_key] = (
+        time.monotonic() + MEMBERSHIP_CACHE_TTL_SECONDS
+    )
+    _MEMBERSHIP_CACHE.move_to_end(cache_key)
+    while len(_MEMBERSHIP_CACHE) > MEMBERSHIP_CACHE_MAX_ENTRIES:
+        _MEMBERSHIP_CACHE.popitem(last=False)
 
 
 async def _join_url(bot, chat, channel: int | str) -> str | None:

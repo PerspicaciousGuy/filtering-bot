@@ -58,6 +58,7 @@ async def _page_view(query, request):
     if not global_settings["search_enabled"]:
         await query.answer("Search is temporarily disabled.", show_alert=True)
         return None
+    await query.answer()
     page_size = get_page_size(global_settings)
     files, next_offset, total = await get_search_results(SearchRequest(
         request.search,
@@ -118,4 +119,3 @@ async def handle_next_page(bot, query):
     if view is None:
         return
     await _render_next_page(query, view)
-    await query.answer()

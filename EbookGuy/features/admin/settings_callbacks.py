@@ -1,5 +1,6 @@
 """Callback navigation for the global settings dashboard."""
 
+import asyncio
 import logging
 
 from pymongo.errors import PyMongoError
@@ -44,9 +45,11 @@ async def _show_category(query, category: str) -> None:
     if category not in CATEGORY_LABELS:
         await query.answer("Unknown settings category.", show_alert=True)
         return
-    await query.answer()
     text, markup = build_category_view(category)
-    await query.message.edit_text(text, reply_markup=markup)
+    await asyncio.gather(
+        query.answer(),
+        query.message.edit_text(text, reply_markup=markup),
+    )
 
 
 async def _show_setting(query, key: str) -> None:
@@ -115,9 +118,11 @@ async def _route_settings_callback(client, query) -> None:
         else:
             await show_analytics(query, parts[0], parts[1])
     elif data == "global_settings:home":
-        await query.answer()
         text, markup = build_settings_dashboard()
-        await query.message.edit_text(text, reply_markup=markup)
+        await asyncio.gather(
+            query.answer(),
+            query.message.edit_text(text, reply_markup=markup),
+        )
     elif data == "global_settings:close":
         await query.answer()
         await query.message.delete()

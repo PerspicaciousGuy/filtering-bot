@@ -12,9 +12,9 @@ from pymongo.errors import PyMongoError
 
 from database.ia_filterdb import get_file_details
 from database.users_chats_db import db
-from EbookGuy.features.downloads.limits import (
+from EbookGuy.features.downloads.auto_delete import (
     auto_delete_notice,
-    delete_delivered_messages,
+    schedule_delivered_messages_deletion,
 )
 from EbookGuy.shared.analytics import track_event
 from EbookGuy.shared.formatting import format_file_caption
@@ -27,6 +27,7 @@ CONVERTIBLE_FORMATS = ("epub", "pdf", "mobi")
 PREVIEW_FORMATS = (*CONVERTIBLE_FORMATS, "azw", "azw3")
 CONVERSION_TIMEOUT_SECONDS = 120
 BYTES_PER_MB = 1024 * 1024
+_CONVERSION_LOCK = asyncio.Lock()
 
 
 @dataclass(frozen=True)
@@ -124,9 +125,15 @@ async def _deliver_conversion(client, query, conversion):
             int(settings["auto_delete_delay_seconds"])
         )
     count_message = await sent_message.reply(count_text)
-    was_deleted = await delete_delivered_messages((sent_message,), settings)
-    if was_deleted:
+
+    async def delete_count_message():
         await count_message.delete()
+
+    schedule_delivered_messages_deletion(
+        (sent_message,),
+        settings,
+        after_delete=delete_count_message,
+    )
 
 
 def _premium_conversion_markup(prefix, file_id):
@@ -295,7 +302,7 @@ async def handle_convert_menu_callback(client, query):
     )
 
 
-async def handle_do_convert_callback(client, query):
+async def _execute_conversion_callback(client, query):
     conversion = await _load_conversion(query)
     if conversion is None:
         return
@@ -333,7 +340,22 @@ async def handle_do_convert_callback(client, query):
             "<b>Conversion failed.</b> Please try again later."
         )
     finally:
-        shutil.rmtree(conversion.work_dir, ignore_errors=True)
+        await asyncio.to_thread(
+            shutil.rmtree,
+            conversion.work_dir,
+            ignore_errors=True,
+        )
+
+
+async def handle_do_convert_callback(client, query):
+    if _CONVERSION_LOCK.locked():
+        await query.answer(
+            "Another conversion is running. Please try again shortly.",
+            show_alert=True,
+        )
+        return
+    async with _CONVERSION_LOCK:
+        await _execute_conversion_callback(client, query)
 
 
 async def handle_convert_back_callback(client, query):
