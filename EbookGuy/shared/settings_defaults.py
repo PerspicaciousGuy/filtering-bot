@@ -1,8 +1,15 @@
 """Environment-backed defaults for global bot settings."""
 
+from decimal import Decimal, InvalidOperation
+
 from info import (
     AUTH_CHANNEL,
     AUTO_DELETE,
+    BINANCE_30_DAYS_USD,
+    BINANCE_90_DAYS_USD,
+    BINANCE_PAY_ID,
+    BINANCE_PAY_URL_30,
+    BINANCE_PAY_URL_90,
     CACHE_TIME,
     CHANNELS,
     CUSTOM_FILE_CAPTION,
@@ -19,6 +26,8 @@ from info import (
     REQST_CHANNEL,
     SUPPORT_CHAT,
     SUPPORT_CHAT_ID,
+    UPI_ID,
+    UPI_PAYEE_NAME,
     USE_CAPTION_FILTER,
 )
 
@@ -57,6 +66,18 @@ LEGACY_GLOBAL_SETTING_ALIASES = {
     "request_unavailable_message": "request_rejected_message",
     "request_uploaded_message": "request_completed_message",
 }
+
+
+def _usd_to_cents(value: str, fallback: int) -> int:
+    try:
+        amount = Decimal(value)
+    except InvalidOperation:
+        return fallback
+    cents = amount * 100
+    if amount <= 0 or cents != cents.to_integral_value():
+        return fallback
+    return int(cents)
+
 
 DEFAULT_GLOBAL_SETTINGS = {
     "free_daily_limit": FREE_DAILY_LIMIT,
@@ -109,6 +130,17 @@ DEFAULT_GLOBAL_SETTINGS = {
     "premium_30_days_inr": PREMIUM_PRICES_INR[30],
     "premium_90_days_inr": PREMIUM_PRICES_INR[90],
     "premium_expiry_notifications_enabled": True,
+    "upi_payments_enabled": bool(UPI_ID and UPI_PAYEE_NAME),
+    "upi_id": UPI_ID,
+    "upi_payee_name": UPI_PAYEE_NAME,
+    "binance_payments_enabled": bool(
+        BINANCE_PAY_URL_30 and BINANCE_PAY_URL_90
+    ),
+    "binance_pay_id": BINANCE_PAY_ID,
+    "binance_pay_url_30": BINANCE_PAY_URL_30,
+    "binance_pay_url_90": BINANCE_PAY_URL_90,
+    "binance_30_days_usd_cents": _usd_to_cents(BINANCE_30_DAYS_USD, 199),
+    "binance_90_days_usd_cents": _usd_to_cents(BINANCE_90_DAYS_USD, 499),
     "maintenance_mode": False,
     "maintenance_message": "The bot is temporarily unavailable.",
     "indexing_enabled": True,

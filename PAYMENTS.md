@@ -282,6 +282,9 @@ configured.
 Set both `UPI_ID` and `UPI_PAYEE_NAME`, and configure a non-zero INR plan price
 through `/settings`.
 
+Administrators can also configure and enable UPI from `/settings` under
+`Manual Payments`. Database values override the environment defaults.
+
 ### Direct UPI button is unavailable
 
 Telegram rejected the `upi://` URL. Copy the displayed UPI ID and amount into
@@ -289,7 +292,11 @@ the payment app, or use an HTTPS redirect page for cross-client support.
 
 ### Binance Pay button is missing
 
-Set the matching plan URL to a complete `https://` or `http://` URL.
+Set the matching plan URL to a complete `https://` URL hosted by Binance.
+
+Administrators can configure both Binance plan links, the displayed amounts,
+and the optional Binance Pay ID from `/settings` under `Manual Payments`.
+Database values override the environment defaults.
 
 ### Checkout says the payment request is invalid
 

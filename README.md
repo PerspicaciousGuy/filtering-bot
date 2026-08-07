@@ -20,7 +20,10 @@ indexing, and Docker deployment.
 ### Administration
 
 - `/settings` dashboard for limits, channels, search, delivery, requests,
-  Premium, messages, analytics, and operational controls
+  Premium, manual payment destinations, messages, analytics, and operational
+  controls
+- Versioned JSON settings backup, validated restore preview, and confirmed
+  restore from the `/settings` dashboard
 - File-channel indexing with checkpoint and resume support
 - File deletion and duplicate detection
 - User broadcasts and direct admin messages

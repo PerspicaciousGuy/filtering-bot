@@ -61,6 +61,14 @@ def build_settings_dashboard() -> tuple[str, InlineKeyboardMarkup]:
         ]
     )
     buttons.append(
+        [
+            InlineKeyboardButton(
+                "Backup & Restore",
+                callback_data="global_settings:backup:home",
+            )
+        ]
+    )
+    buttons.append(
         [InlineKeyboardButton("Close", callback_data=f"{CALLBACK_PREFIX}:close")]
     )
     text = (

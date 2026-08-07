@@ -21,28 +21,36 @@ from EbookGuy.features.premium import (
     manual_payment_options,
     manual_payments,
 )
+from EbookGuy.features.admin import settings_runtime_validation
+from EbookGuy.shared.settings_schema import validate_setting_value
+
+
+def manual_payment_settings(**overrides):
+    settings = {
+        "premium_30_days_inr": 170,
+        "premium_90_days_inr": 425,
+        "upi_payments_enabled": True,
+        "upi_id": "merchant@bank",
+        "upi_payee_name": "Example Merchant",
+        "binance_payments_enabled": True,
+        "binance_pay_id": "123456789",
+        "binance_pay_url_30": "https://s.binance.com/example30",
+        "binance_pay_url_90": "https://s.binance.com/example90",
+        "binance_30_days_usd_cents": 199,
+        "binance_90_days_usd_cents": 499,
+    }
+    settings.update(overrides)
+    return settings
 
 
 class ManualPaymentOptionTests(unittest.TestCase):
     def test_builds_upi_link_for_selected_plan_amount(self):
-        settings = {"premium_30_days_inr": 170}
+        settings = manual_payment_settings()
 
-        with (
-            patch.object(
-                manual_payment_options,
-                "UPI_ID",
-                "merchant@bank",
-            ),
-            patch.object(
-                manual_payment_options,
-                "UPI_PAYEE_NAME",
-                "Example Merchant",
-            ),
-        ):
-            payment_url = manual_payment_options.build_upi_payment_url(
-                30,
-                settings,
-            )
+        payment_url = manual_payment_options.build_upi_payment_url(
+            30,
+            settings,
+        )
 
         query = parse_qs(urlparse(payment_url).query)
         self.assertEqual(urlparse(payment_url).scheme, "upi")
@@ -52,50 +60,102 @@ class ManualPaymentOptionTests(unittest.TestCase):
         self.assertEqual(query["am"], ["170"])
 
     def test_maps_binance_link_to_90_day_plan(self):
-        settings = {"premium_90_days_inr": 425}
+        settings = manual_payment_settings(
+            binance_pay_url_90="https://s.binance.com/plan90",
+        )
 
-        with (
-            patch.dict(
-                manual_payment_options.BINANCE_URLS,
-                {90: "https://pay.example/90"},
-                clear=True,
-            ),
-            patch.dict(
-                manual_payment_options.BINANCE_AMOUNTS,
-                {90: "4.99"},
-                clear=True,
-            ),
-            patch.object(
-                manual_payment_options,
-                "BINANCE_PAY_ID",
-                "123456789",
-            ),
-        ):
-            details = manual_payment_options.get_manual_payment_details(
-                "binance",
-                90,
-                settings,
-            )
+        details = manual_payment_options.get_manual_payment_details(
+            "binance",
+            90,
+            settings,
+        )
 
-        self.assertEqual(details.payment_url, "https://pay.example/90")
+        self.assertEqual(details.payment_url, "https://s.binance.com/plan90")
         self.assertEqual(details.amount_label, "USD 4.99")
         self.assertEqual(details.destination_value, "123456789")
 
     def test_hides_invalid_binance_url(self):
-        settings = {"premium_30_days_inr": 170}
+        settings = manual_payment_settings(
+            binance_pay_url_30="binance://unsupported",
+        )
 
-        with patch.dict(
-            manual_payment_options.BINANCE_URLS,
-            {30: "binance://unsupported"},
-            clear=True,
-        ):
-            details = manual_payment_options.get_manual_payment_details(
-                "binance",
-                30,
-                settings,
-            )
+        details = manual_payment_options.get_manual_payment_details(
+            "binance",
+            30,
+            settings,
+        )
 
         self.assertIsNone(details)
+
+    def test_hides_disabled_manual_payment_methods(self):
+        settings = manual_payment_settings(
+            upi_payments_enabled=False,
+            binance_payments_enabled=False,
+        )
+
+        names = manual_payment_options.manual_payment_method_names(30, settings)
+
+        self.assertEqual(names, [])
+
+
+class ManualPaymentSettingValidationTests(unittest.TestCase):
+    def test_accepts_binance_short_link(self):
+        value = validate_setting_value(
+            "binance_pay_url_30",
+            "https://s.binance.com/example",
+        )
+
+        self.assertEqual(value, "https://s.binance.com/example")
+
+    def test_rejects_non_binance_payment_link(self):
+        with self.assertRaisesRegex(ValueError, "binance.com"):
+            validate_setting_value(
+                "binance_pay_url_30",
+                "https://example.com/payment",
+            )
+
+    def test_clears_optional_payment_values_with_zero(self):
+        self.assertEqual(validate_setting_value("upi_id", "0"), "")
+        self.assertEqual(validate_setting_value("binance_pay_id", "0"), "")
+
+
+class ManualPaymentRuntimeValidationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rejects_enabling_incomplete_upi_configuration(self):
+        settings = manual_payment_settings(
+            upi_payments_enabled=False,
+            upi_id="",
+            upi_payee_name="",
+        )
+
+        with patch.object(
+            settings_runtime_validation,
+            "get_global_settings",
+            AsyncMock(return_value=settings),
+        ):
+            with self.assertRaisesRegex(ValueError, "UPI ID and payee name"):
+                await settings_runtime_validation.validate_runtime_setting(
+                    None,
+                    "upi_payments_enabled",
+                    True,
+                )
+
+    async def test_allows_configuring_upi_while_method_is_disabled(self):
+        settings = manual_payment_settings(
+            upi_payments_enabled=False,
+            upi_id="",
+            upi_payee_name="",
+        )
+
+        with patch.object(
+            settings_runtime_validation,
+            "get_global_settings",
+            AsyncMock(return_value=settings),
+        ):
+            await settings_runtime_validation.validate_runtime_setting(
+                None,
+                "upi_id",
+                "merchant@bank",
+            )
 
 
 class ManualPaymentCallbackTests(unittest.IsolatedAsyncioTestCase):

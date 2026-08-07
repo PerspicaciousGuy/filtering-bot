@@ -102,6 +102,36 @@ async def reset_global_setting(key: str, admin_id: int) -> tuple[object, object]
     return previous_value, default_value
 
 
+async def restore_global_settings(
+    values: dict[str, object],
+    admin_id: int,
+    details: dict[str, object],
+) -> int:
+    """Apply validated backup values together and refresh the settings cache."""
+    settings = await get_global_settings()
+    changes = {
+        key: value
+        for key, value in values.items()
+        if settings[key] != value
+    }
+    if not changes:
+        return 0
+    await db.update_global_settings(changes)
+    settings.update(changes)
+    _cache_settings(settings)
+    audit_details = {
+        **details,
+        "changed_settings": sorted(changes),
+        "changed_count": len(changes),
+    }
+    await record_admin_action(
+        "global_settings_restored",
+        admin_id,
+        audit_details,
+    )
+    return len(changes)
+
+
 async def record_admin_action(
     action: str,
     admin_id: int,
@@ -130,5 +160,6 @@ __all__ = [
     "get_global_settings",
     "record_admin_action",
     "reset_global_setting",
+    "restore_global_settings",
     "save_global_setting",
 ]

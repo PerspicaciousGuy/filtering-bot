@@ -47,6 +47,26 @@ class GlobalSettingsMixin:
             upsert=True,
         )
 
+    async def update_global_settings(
+        self,
+        values: dict[str, object],
+    ) -> None:
+        """Persist multiple known settings in one MongoDB update."""
+        unknown_keys = set(values) - set(DEFAULT_GLOBAL_SETTINGS)
+        if unknown_keys:
+            unknown = ", ".join(sorted(unknown_keys))
+            raise KeyError(f"Unknown global settings: {unknown}")
+        if not values:
+            return
+        await self.global_settings.update_one(
+            {"_id": GLOBAL_SETTINGS_ID},
+            {"$set": {
+                f"values.{key}": value
+                for key, value in values.items()
+            }},
+            upsert=True,
+        )
+
     async def reset_global_setting(self, key: str) -> None:
         """Remove one stored override so its configured default applies."""
         if not is_known_setting(key):

@@ -4,6 +4,7 @@ from pyrogram.types import CallbackQuery
 
 from EbookGuy.shared.callback_metrics import measure_callback
 from EbookGuy.features.admin.settings_input import is_settings_input_active
+from EbookGuy.features.admin.settings_restore import is_settings_restore_active
 from plugins.pm_filter_callbacks import handle_callback
 from plugins.pm_filter_search import (
     handle_format_selection,
@@ -35,7 +36,10 @@ SHARED_CALLBACK_PATTERN = (
     & filters.regex(r"^[^/#]")
 )
 async def pm_text(bot, message):
-    if is_settings_input_active(message.from_user.id):
+    if (
+        is_settings_input_active(message.from_user.id)
+        or is_settings_restore_active(message.from_user.id)
+    ):
         return
     await handle_private_text(bot, message)
 

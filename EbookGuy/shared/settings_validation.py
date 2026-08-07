@@ -5,6 +5,13 @@ import re
 from string import Formatter
 from urllib.parse import urlparse
 
+from EbookGuy.shared.payment_settings_validation import (
+    validate_binance_url,
+    validate_optional_digits,
+    validate_optional_text,
+    validate_upi_id,
+)
+
 
 CAPTION_TEMPLATE_FIELDS = {
     "file_name",
@@ -190,6 +197,42 @@ SETTING_RULES = {
     "premium_30_days_inr": {"kind": "integer", "minimum": 1, "maximum": 10000000},
     "premium_90_days_inr": {"kind": "integer", "minimum": 1, "maximum": 10000000},
     "premium_expiry_notifications_enabled": {"kind": "boolean"},
+    "upi_payments_enabled": {"kind": "boolean"},
+    "upi_id": {
+        "kind": "upi_id",
+        "hint": "Enter a UPI ID such as name@bank, or send 0 to clear it.",
+    },
+    "upi_payee_name": {
+        "kind": "optional_text",
+        "maximum_length": 100,
+        "hint": "Enter the recipient name, or send 0 to clear it.",
+    },
+    "binance_payments_enabled": {"kind": "boolean"},
+    "binance_pay_id": {
+        "kind": "optional_digits",
+        "maximum_length": 32,
+        "hint": "Enter the numeric Binance Pay ID, or send 0 to clear it.",
+    },
+    "binance_pay_url_30": {
+        "kind": "binance_url",
+        "hint": "Enter the 30-day HTTPS Binance URL, or send 0 to clear it.",
+    },
+    "binance_pay_url_90": {
+        "kind": "binance_url",
+        "hint": "Enter the 90-day HTTPS Binance URL, or send 0 to clear it.",
+    },
+    "binance_30_days_usd_cents": {
+        "kind": "integer",
+        "minimum": 1,
+        "maximum": 100000000,
+        "hint": "Enter US cents. Example: 199 means $1.99.",
+    },
+    "binance_90_days_usd_cents": {
+        "kind": "integer",
+        "minimum": 1,
+        "maximum": 100000000,
+        "hint": "Enter US cents. Example: 499 means $4.99.",
+    },
     "maintenance_mode": {"kind": "boolean"},
     "maintenance_message": {
         "kind": "text",
@@ -391,6 +434,10 @@ SETTING_VALIDATORS = {
     "caption_template": _validate_caption_template,
     "message_template": _validate_message_template,
     "url": _validate_url,
+    "upi_id": validate_upi_id,
+    "optional_text": validate_optional_text,
+    "optional_digits": validate_optional_digits,
+    "binance_url": validate_binance_url,
 }
 
 

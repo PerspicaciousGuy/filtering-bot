@@ -15,6 +15,17 @@ CHANNEL_SETTINGS = {
     "required_subscription_channels",
     "support_chat_id",
 }
+PAYMENT_SETTINGS = {
+    "upi_payments_enabled",
+    "upi_id",
+    "upi_payee_name",
+    "binance_payments_enabled",
+    "binance_pay_id",
+    "binance_pay_url_30",
+    "binance_pay_url_90",
+    "binance_30_days_usd_cents",
+    "binance_90_days_usd_cents",
+}
 
 
 async def _validate_configured_channels(
@@ -80,6 +91,52 @@ async def validate_runtime_setting(
         channels = _setting_channels(value)
         await _validate_source_channel_overlap(key, channels)
         await _validate_configured_channels(client, channels)
+    if key in PAYMENT_SETTINGS:
+        settings = await get_global_settings()
+        settings[key] = value
+        _validate_manual_payment_settings(settings)
 
 
-__all__ = ["validate_runtime_setting"]
+def _validate_manual_payment_settings(settings: dict[str, object]) -> None:
+    if settings["upi_payments_enabled"]:
+        if not settings["upi_id"] or not settings["upi_payee_name"]:
+            raise ValueError(
+                "Configure the UPI ID and payee name before enabling UPI."
+            )
+    if settings["binance_payments_enabled"]:
+        if not settings["binance_pay_url_30"] or not settings["binance_pay_url_90"]:
+            raise ValueError(
+                "Configure both Binance plan URLs before enabling Binance Pay."
+            )
+
+
+async def validate_runtime_settings(
+    client: object,
+    settings: dict[str, object],
+    changed_keys: set[str],
+) -> None:
+    """Validate restored channel settings against their combined final state."""
+    changed_channel_keys = CHANNEL_SETTINGS.intersection(changed_keys)
+    if not changed_channel_keys:
+        channels = []
+    else:
+        file_channels = _setting_channels(settings["file_channel_ids"])
+        delete_channels = _setting_channels(settings["delete_channel_ids"])
+        overlap = set(file_channels).intersection(delete_channels)
+        if overlap:
+            channel = next(iter(overlap))
+            raise ValueError(
+                f"Channel {channel} cannot index and delete files at the same time."
+            )
+        channels = []
+        for key in changed_channel_keys:
+            for channel in _setting_channels(settings[key]):
+                if channel not in channels:
+                    channels.append(channel)
+    if channels:
+        await _validate_configured_channels(client, channels)
+    if PAYMENT_SETTINGS.intersection(changed_keys):
+        _validate_manual_payment_settings(settings)
+
+
+__all__ = ["validate_runtime_setting", "validate_runtime_settings"]

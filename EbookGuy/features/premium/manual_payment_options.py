@@ -6,24 +6,6 @@ from urllib.parse import urlencode
 from pyrogram.types import InlineKeyboardButton
 
 from EbookGuy.features.premium.plans import get_inr_price
-from info import (
-    BINANCE_30_DAYS_USD,
-    BINANCE_90_DAYS_USD,
-    BINANCE_PAY_ID,
-    BINANCE_PAY_URL_30,
-    BINANCE_PAY_URL_90,
-    UPI_ID,
-    UPI_PAYEE_NAME,
-)
-
-BINANCE_AMOUNTS = {
-    30: BINANCE_30_DAYS_USD,
-    90: BINANCE_90_DAYS_USD,
-}
-BINANCE_URLS = {
-    30: BINANCE_PAY_URL_30,
-    90: BINANCE_PAY_URL_90,
-}
 
 
 @dataclass(frozen=True)
@@ -47,12 +29,19 @@ def is_http_url(value: str) -> bool:
 def build_upi_payment_url(days: int, settings: dict[str, object]) -> str:
     """Build the direct UPI URI for a configured Premium plan."""
     amount = int(get_inr_price(settings, days) or 0)
-    if not UPI_ID or not UPI_PAYEE_NAME or amount <= 0:
+    upi_id = str(settings["upi_id"])
+    payee_name = str(settings["upi_payee_name"])
+    if (
+        not settings["upi_payments_enabled"]
+        or not upi_id
+        or not payee_name
+        or amount <= 0
+    ):
         return ""
     query = urlencode(
         {
-            "pa": UPI_ID,
-            "pn": UPI_PAYEE_NAME,
+            "pa": upi_id,
+            "pn": payee_name,
             "cu": "INR",
             "am": str(amount),
         }
@@ -60,9 +49,19 @@ def build_upi_payment_url(days: int, settings: dict[str, object]) -> str:
     return f"upi://pay?{query}"
 
 
-def _binance_payment_url(days: int) -> str:
-    url = BINANCE_URLS.get(days, "")
+def _binance_payment_url(
+    days: int,
+    settings: dict[str, object],
+) -> str:
+    if not settings["binance_payments_enabled"] or days not in {30, 90}:
+        return ""
+    url = str(settings[f"binance_pay_url_{days}"])
     return url if is_http_url(url) else ""
+
+
+def _format_usd_cents(cents: object) -> str:
+    whole, fraction = divmod(int(cents), 100)
+    return f"{whole}.{fraction:02d}"
 
 
 def manual_payment_method_buttons(
@@ -80,7 +79,7 @@ def manual_payment_method_buttons(
                 )
             ]
         )
-    if _binance_payment_url(days):
+    if _binance_payment_url(days, settings):
         buttons.append(
             [
                 InlineKeyboardButton(
@@ -100,7 +99,7 @@ def manual_payment_method_names(
     names = []
     if build_upi_payment_url(days, settings):
         names.append("Google Pay / UPI - manual verification")
-    if _binance_payment_url(days):
+    if _binance_payment_url(days, settings):
         names.append("Binance Pay - manual verification")
     return names
 
@@ -122,12 +121,14 @@ def get_manual_payment_details(
             days=days,
             amount_label=f"INR {amount}",
             destination_label="UPI ID",
-            destination_value=UPI_ID,
+            destination_value=str(settings["upi_id"]),
             payment_url=payment_url,
         )
 
-    payment_url = _binance_payment_url(days)
-    amount = BINANCE_AMOUNTS.get(days, "")
+    payment_url = _binance_payment_url(days, settings)
+    amount = _format_usd_cents(
+        settings.get(f"binance_{days}_days_usd_cents", 0)
+    )
     if provider != "binance" or not payment_url or not amount:
         return None
     return ManualPaymentDetails(
@@ -136,7 +137,9 @@ def get_manual_payment_details(
         days=days,
         amount_label=f"USD {amount}",
         destination_label="Binance Pay ID",
-        destination_value=BINANCE_PAY_ID or "Open the payment link",
+        destination_value=(
+            str(settings["binance_pay_id"]) or "Open the payment link"
+        ),
         payment_url=payment_url,
     )
 

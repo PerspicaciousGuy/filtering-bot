@@ -10,6 +10,12 @@ from pyrogram.errors import ListenerTimeout, RPCError
 from pymongo.errors import PyMongoError
 
 from EbookGuy.features.admin.settings_commands import build_setting_detail
+from EbookGuy.features.admin.settings_confirmation import (
+    SettingChangeRequest,
+    is_setting_confirmation_pending,
+    requires_setting_confirmation,
+    stage_setting_confirmation,
+)
 from EbookGuy.features.admin.settings_runtime_validation import (
     validate_runtime_setting,
 )
@@ -95,6 +101,19 @@ async def _apply_input(reply, prompt, context: SettingsInput) -> bool:
         await _delete_messages((reply,))
         _retain_input_task(_delete_confirmation(notice))
         return False
+    if requires_setting_confirmation(context.key):
+        settings = await get_global_settings()
+        await stage_setting_confirmation(
+            SettingChangeRequest(
+                admin_id=context.admin_id,
+                key=context.key,
+                previous_value=settings[context.key],
+                new_value=value,
+                message=context.message,
+            )
+        )
+        await _delete_messages((prompt, reply))
+        return True
     previous = await save_global_setting(
         context.key,
         value,
@@ -156,7 +175,7 @@ async def start_setting_input(client, query, key: str) -> None:
     if is_boolean_setting(key):
         await query.answer("Use the Enable or Disable button.", show_alert=True)
         return
-    if admin_id in _active_admins:
+    if admin_id in _active_admins or is_setting_confirmation_pending(admin_id):
         await query.answer(
             "Finish or cancel your current settings update.",
             show_alert=True,

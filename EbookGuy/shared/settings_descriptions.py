@@ -142,6 +142,33 @@ SETTING_DESCRIPTIONS = {
     "premium_expiry_notifications_enabled": (
         "Controls whether users are notified before Premium access expires."
     ),
+    "upi_payments_enabled": (
+        "Shows Google Pay / UPI when a valid UPI ID and payee name are configured."
+    ),
+    "upi_id": (
+        "UPI virtual payment address that receives manual Premium payments."
+    ),
+    "upi_payee_name": (
+        "Recipient name included in generated Google Pay and UPI payment links."
+    ),
+    "binance_payments_enabled": (
+        "Shows Binance Pay when both plan payment links are configured."
+    ),
+    "binance_pay_id": (
+        "Optional Binance Pay recipient ID displayed on payment instructions."
+    ),
+    "binance_pay_url_30": (
+        "HTTPS Binance Pay link used for the 30-day Premium plan."
+    ),
+    "binance_pay_url_90": (
+        "HTTPS Binance Pay link used for the 90-day Premium plan."
+    ),
+    "binance_30_days_usd_cents": (
+        "Displayed 30-day Binance amount in US cents. For example, 199 is $1.99."
+    ),
+    "binance_90_days_usd_cents": (
+        "Displayed 90-day Binance amount in US cents. For example, 499 is $4.99."
+    ),
     "maintenance_mode": (
         "Temporarily restricts normal user features while maintenance is active."
     ),
