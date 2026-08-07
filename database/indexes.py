@@ -1,6 +1,7 @@
 """Indexes required by high-frequency bot operations."""
 
 import asyncio
+from dataclasses import dataclass
 
 from database.file_collections import (
     active_file_collections,
@@ -9,26 +10,59 @@ from database.file_collections import (
 from database.users_chats_db import db
 
 
+@dataclass(frozen=True)
+class IndexRequirement:
+    """One lookup index the bot needs, independent of its stored name."""
+
+    collection: object
+    keys: tuple[tuple[str, int], ...]
+    name: str
+    is_unique: bool = False
+
+
+async def _ensure_index(requirement):
+    existing_indexes = await requirement.collection.index_information()
+    for existing_name, details in existing_indexes.items():
+        if tuple(details["key"]) == requirement.keys:
+            return existing_name
+    return await requirement.collection.create_index(
+        list(requirement.keys),
+        unique=requirement.is_unique,
+        name=requirement.name,
+    )
+
+
 async def ensure_core_indexes():
     """Create lookup indexes used by downloads, users, and checkpoints."""
-    operations = [
-        db.col.create_index("id", unique=True, name="user_id_unique"),
-        checkpoint_col.create_index(
-            "chat_id",
-            unique=True,
-            name="checkpoint_chat_id_unique",
+    requirements = [
+        IndexRequirement(
+            db.col,
+            (("id", 1),),
+            "user_id_unique",
+            is_unique=True,
+        ),
+        IndexRequirement(
+            checkpoint_col,
+            (("chat_id", 1),),
+            "checkpoint_chat_id_unique",
+            is_unique=True,
         ),
     ]
     for collection in active_file_collections():
-        operations.extend([
-            collection.create_index(
-                "file_id",
-                unique=True,
-                name="file_id_unique",
+        requirements.extend([
+            IndexRequirement(
+                collection,
+                (("file_id", 1),),
+                "file_id_unique",
+                is_unique=True,
             ),
-            collection.create_index(
-                "file_name",
-                name="file_name_lookup",
+            IndexRequirement(
+                collection,
+                (("file_name", 1),),
+                "file_name_lookup",
             ),
         ])
-    await asyncio.gather(*operations)
+    await asyncio.gather(*(
+        _ensure_index(requirement)
+        for requirement in requirements
+    ))
