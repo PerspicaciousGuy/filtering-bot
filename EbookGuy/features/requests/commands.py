@@ -93,7 +93,6 @@ def _request_text(submission, includes_reporter_id):
         reporter = reporter_name
     return (
         f"<b>Reporter :</b> <code>{reporter}</code>\n\n"
-        f"<b>Request ID:</b> <code>{submission.request_id}</code>\n"
         f"<b>Book:</b> <code>{escape(submission.title)}</code>\n"
         f"<b>Author:</b> <code>{escape(submission.author)}</code>"
     )
