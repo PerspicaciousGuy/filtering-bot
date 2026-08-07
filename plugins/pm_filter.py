@@ -15,6 +15,18 @@ from plugins.pm_filter_search import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
+SHARED_CALLBACK_PATTERN = (
+    r"^(?:"
+    r"close_data$|"
+    r"(?:file[^#]*|del|checksub|pages)(?:#|$)|"
+    r"(?:show_option|request_options|unavailable|uploaded|"
+    r"already_available|processing)(?:#|$)|"
+    r"rq_alert_[^#]+(?:#|$)|"
+    r"payment_method_.+$|"
+    r"crypto_(?:binance|other)$"
+    r")"
+)
+
 
 @Client.on_message(
     filters.private
@@ -46,7 +58,7 @@ async def switch_format(bot, query):
     await handle_switch_format(bot, query)
 
 
-@Client.on_callback_query()
+@Client.on_callback_query(filters.regex(SHARED_CALLBACK_PATTERN))
 @measure_callback("callback_dispatch")
 async def cb_handler(client: Client, query: CallbackQuery):
     await handle_callback(client, query)
