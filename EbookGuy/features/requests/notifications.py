@@ -43,28 +43,28 @@ class RequestNotification:
 REQUEST_STATUSES = {
     "unavailable": RequestStatusDefinition(
         key="unavailable",
-        button_text="Unavailable",
+        button_text="\u26a0\ufe0f Unavailable \u26a0\ufe0f",
         template_setting="request_unavailable_message",
         confirmation="Set to Unavailable",
         requester_alert="Your request is unavailable.",
     ),
     "uploaded": RequestStatusDefinition(
         key="uploaded",
-        button_text="Uploaded",
+        button_text="\u2705 Uploaded \u2705",
         template_setting="request_uploaded_message",
         confirmation="Set to Uploaded",
         requester_alert="Your request has been uploaded.",
     ),
     "already_available": RequestStatusDefinition(
         key="already_available",
-        button_text="Already Available",
+        button_text="\U0001f7e2 Already Available \U0001f7e2",
         template_setting="request_already_available_message",
         confirmation="Set to Already Available",
         requester_alert="Your request is already available.",
     ),
     "processing": RequestStatusDefinition(
         key="processing",
-        button_text="Processing",
+        button_text="\U0001f7e1 Processing \U0001f7e1",
         template_setting="request_processing_message",
         confirmation="Set to Processing",
         requester_alert="Your request is processing.",

@@ -60,21 +60,21 @@ def _status_options_markup(token: str) -> InlineKeyboardMarkup:
         [
             [
                 InlineKeyboardButton(
-                    "Unavailable",
+                    REQUEST_STATUSES["unavailable"].button_text,
                     callback_data=f"unavailable#{token}",
                 ),
                 InlineKeyboardButton(
-                    "Uploaded",
+                    REQUEST_STATUSES["uploaded"].button_text,
                     callback_data=f"uploaded#{token}",
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    "Already Available",
+                    REQUEST_STATUSES["already_available"].button_text,
                     callback_data=f"already_available#{token}",
                 ),
                 InlineKeyboardButton(
-                    "Processing",
+                    REQUEST_STATUSES["processing"].button_text,
                     callback_data=f"processing#{token}",
                 ),
             ],
