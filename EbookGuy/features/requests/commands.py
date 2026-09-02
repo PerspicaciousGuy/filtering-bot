@@ -343,5 +343,7 @@ async def handle_requests(bot, message):
         reply_markup=request_format_markup(
             request_id,
             message.from_user.id,
+            message.id,
         ),
+        quote=True,
     )

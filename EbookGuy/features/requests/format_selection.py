@@ -3,10 +3,12 @@
 from dataclasses import dataclass
 
 from bson import ObjectId
+from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-REQUEST_FORMAT_CALLBACK = "request_format"
+REQUEST_FORMAT_CALLBACK = "rqf"
+LEGACY_REQUEST_FORMAT_CALLBACK = "request_format"
 REQUEST_FORMAT_LABELS = {
     "ebook": "\U0001f4d6 Ebook",
     "audiobook": "\U0001f3a7 Audiobook",
@@ -20,16 +22,17 @@ class RequestFormatSelection:
     request_id: ObjectId
     request_format: str
     user_id: int
+    source_message_id: int
 
 
-def request_format_markup(request_id, user_id):
+def request_format_markup(request_id, user_id, source_message_id):
     """Build the one-time Ebook, Audiobook, and Cancel selection keyboard."""
     def format_button(request_format):
         return InlineKeyboardButton(
             REQUEST_FORMAT_LABELS[request_format],
             callback_data=(
                 f"{REQUEST_FORMAT_CALLBACK}#{request_id}#"
-                f"{request_format}#{user_id}"
+                f"{request_format}#{user_id}#{source_message_id}"
             ),
         )
 
@@ -41,7 +44,7 @@ def request_format_markup(request_id, user_id):
                     "Cancel",
                     callback_data=(
                         f"{REQUEST_FORMAT_CALLBACK}#{request_id}#"
-                        f"cancel#{user_id}"
+                        f"cancel#{user_id}#{source_message_id}"
                     ),
                 )
             ],
@@ -51,9 +54,13 @@ def request_format_markup(request_id, user_id):
 
 def _parse_format_selection(data):
     parts = data.split("#")
-    if len(parts) != 4 or parts[0] != REQUEST_FORMAT_CALLBACK:
+    if len(parts) == 5 and parts[0] == REQUEST_FORMAT_CALLBACK:
+        _, request_id, request_format, user_id, source_message_id = parts
+    elif len(parts) == 4 and parts[0] == LEGACY_REQUEST_FORMAT_CALLBACK:
+        _, request_id, request_format, user_id = parts
+        source_message_id = 0
+    else:
         raise ValueError("Invalid format selection")
-    _, request_id, request_format, user_id = parts
     if request_format not in {*REQUEST_FORMAT_LABELS, "cancel"}:
         raise ValueError("Invalid request format")
     try:
@@ -61,9 +68,25 @@ def _parse_format_selection(data):
             request_id=ObjectId(request_id),
             request_format=request_format,
             user_id=int(user_id),
+            source_message_id=int(source_message_id),
         )
     except (TypeError, ValueError) as error:
         raise ValueError("Invalid format selection") from error
+
+
+async def _source_request_message(bot, query, selection):
+    source_message = query.message.reply_to_message
+    if source_message is not None:
+        return source_message
+    if not selection.source_message_id:
+        return None
+    try:
+        return await bot.get_messages(
+            query.message.chat.id,
+            selection.source_message_id,
+        )
+    except RPCError:
+        return None
 
 
 async def handle_request_format_callback(bot, query, submit_selected_format):
@@ -83,11 +106,12 @@ async def handle_request_format_callback(bot, query, submit_selected_format):
         await query.answer("Request cancelled")
         await query.message.edit_text("Your request has been cancelled.")
         return
-    source_message = query.message.reply_to_message
+    source_message = await _source_request_message(bot, query, selection)
     if source_message is None:
         await query.answer("Please send the request again.", show_alert=True)
         return
-    if source_message.from_user.id != selection.user_id:
+    source_user = getattr(source_message, "from_user", None)
+    if source_user is None or source_user.id != selection.user_id:
         await query.answer("This request selection is invalid.", show_alert=True)
         return
     label = REQUEST_FORMAT_LABELS[selection.request_format]

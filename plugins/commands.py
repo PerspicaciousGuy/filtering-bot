@@ -129,7 +129,7 @@ async def requests(bot, message):
     await handle_requests(bot, message)
 
 
-@Client.on_callback_query(filters.regex(r"^request_format#"))
+@Client.on_callback_query(filters.regex(r"^(?:rqf|request_format)#"))
 @measure_callback("request_format")
 async def request_format_callback(bot, query):
     await handle_request_format_callback(bot, query, submit_selected_format)
