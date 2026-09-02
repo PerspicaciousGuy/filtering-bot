@@ -10,6 +10,11 @@ from pyrogram.errors import RPCError
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database.users_chats_db import db
+from EbookGuy.features.requests.format_selection import (
+    REQUEST_FORMAT_LABELS,
+    RequestFormatSelection,
+    request_format_markup,
+)
 from EbookGuy.shared.analytics import track_event
 from EbookGuy.shared.global_settings import get_global_settings
 from info import ADMINS, CHNL_LNK
@@ -34,6 +39,7 @@ FORWARD_ERROR_MESSAGE = (
 )
 _USER_REQUEST_LOCKS = weakref.WeakValueDictionary()
 _CONTENT_REQUEST_LOCKS = weakref.WeakValueDictionary()
+_REQUEST_ID_LOCKS = weakref.WeakValueDictionary()
 
 
 def _request_lock(lock_registry, key):
@@ -60,6 +66,7 @@ class RequestSubmission:
     request_id: ObjectId
     title: str
     author: str
+    request_format: str
 
 
 def _extract_request_content(message):
@@ -100,6 +107,10 @@ def _request_text(submission, includes_reporter_id):
         text += (
             f"\n<b>Author:</b> <code>{escape(submission.author)}</code>"
         )
+    text += (
+        "\n<b>Format:</b> "
+        f"<code>{escape(REQUEST_FORMAT_LABELS[submission.request_format])}</code>"
+    )
     return text
 
 
@@ -206,6 +217,7 @@ def _request_record(submission, reported_post):
         "content": submission.content,
         "title": submission.title,
         "author": submission.author,
+        "format": submission.request_format,
         "normalized_content": submission.normalized_content,
         "request_date": submitted_at.date().isoformat(),
         "submitted_at": submitted_at,
@@ -217,6 +229,10 @@ def _request_record(submission, reported_post):
 
 
 async def _submit_request(submission):
+    request_id_lock = _request_lock(
+        _REQUEST_ID_LOCKS,
+        str(submission.request_id),
+    )
     user_lock = _request_lock(
         _USER_REQUEST_LOCKS,
         submission.message.from_user.id,
@@ -225,26 +241,32 @@ async def _submit_request(submission):
         _CONTENT_REQUEST_LOCKS,
         submission.normalized_content,
     )
-    async with user_lock, content_lock:
+    async with request_id_lock, user_lock, content_lock:
+        if await db.get_request_record(str(submission.request_id)):
+            await submission.message.reply_text(
+                "This request has already been submitted."
+            )
+            return False
         denial = await _request_denial(submission)
         if denial:
             await submission.message.reply_text(denial)
-            return
+            return False
         try:
             reported_post = await _forward_request(submission)
         except RPCError:
             logger.exception("Failed to forward request")
             await submission.message.reply_text(FORWARD_ERROR_MESSAGE)
-            return
+            return False
         if reported_post is None:
             logger.error("No request destination is configured")
             await submission.message.reply_text(FORWARD_ERROR_MESSAGE)
-            return
+            return False
         await db.record_request(_request_record(submission, reported_post))
         track_event(
             "request.submitted",
             submission.message.from_user.id,
             request_id=str(submission.request_id),
+            request_format=submission.request_format,
         )
     try:
         await _confirm_request(submission, reported_post)
@@ -253,10 +275,47 @@ async def _submit_request(submission):
         await submission.message.reply_text(
             "Your request was sent, but confirmation could not be displayed."
         )
+    return True
+
+
+async def submit_selected_format(
+    bot,
+    message,
+    selection: RequestFormatSelection,
+):
+    """Build and submit a request with its user-selected format."""
+    settings = await get_global_settings()
+    if not settings["requests_enabled"]:
+        await message.reply_text("Book requests are temporarily disabled.")
+        return False
+    content = _extract_request_content(message)
+    try:
+        title, author = _parse_request_content(
+            content,
+            bool(settings["request_author_required"]),
+        )
+    except ValueError as error:
+        await message.reply_text(str(error))
+        return False
+    await db.ensure_request_indexes()
+    submission = RequestSubmission(
+        bot=bot,
+        message=message,
+        content=content,
+        normalized_content=_normalize_request(
+            f"{title} | {author or MISSING_AUTHOR_KEY}"
+        ),
+        settings=settings,
+        request_id=selection.request_id,
+        title=title,
+        author=author,
+        request_format=selection.request_format,
+    )
+    return await _submit_request(submission)
 
 
 async def handle_requests(bot, message):
-    """Validate, limit, forward, and confirm a user book request."""
+    """Validate a request and ask the requester to select its format."""
     settings = await get_global_settings()
     if not settings["requests_enabled"]:
         await message.reply_text("Book requests are temporarily disabled.")
@@ -271,25 +330,18 @@ async def handle_requests(bot, message):
         )
         return
     try:
-        title, author = _parse_request_content(
+        _parse_request_content(
             content,
             bool(settings["request_author_required"]),
         )
     except ValueError as error:
         await message.reply_text(str(error))
         return
-    await db.ensure_request_indexes()
     request_id = ObjectId()
-    submission = RequestSubmission(
-        bot=bot,
-        message=message,
-        content=content,
-        normalized_content=_normalize_request(
-            f"{title} | {author or MISSING_AUTHOR_KEY}"
+    await message.reply_text(
+        "Select the format you are requesting:",
+        reply_markup=request_format_markup(
+            request_id,
+            message.from_user.id,
         ),
-        settings=settings,
-        request_id=request_id,
-        title=title,
-        author=author,
     )
-    await _submit_request(submission)

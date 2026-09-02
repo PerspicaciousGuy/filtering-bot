@@ -27,8 +27,8 @@ indexing, and Docker deployment.
 - File-channel indexing with checkpoint and resume support
 - File deletion and duplicate detection
 - User broadcasts and direct admin messages
-- Book request workflow with Processing, Uploaded, Already Available, and
-  Unavailable statuses
+- Book requests with Ebook/Audiobook selection and Processing, Uploaded,
+  Already Available, and Unavailable statuses
 - Runtime analytics for users, searches, downloads, requests, conversions, and
   Telegram Stars payments
 
@@ -154,7 +154,7 @@ checks. The Docker image already defines this health check.
 | `/start` | Open the bot and begin searching |
 | `/plan` | View Premium plans and payment methods |
 | `/mystatus` | View Premium status and remaining usage |
-| `/request Title \| Author` | Submit a book request |
+| `/request <book details>` | Start a request, then select Ebook or Audiobook |
 | `/trending_now` | View recent trending searches |
 | `/id` | Display the user's Telegram ID |
 | `/info` | Display Telegram account information |

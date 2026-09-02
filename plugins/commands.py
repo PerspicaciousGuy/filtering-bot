@@ -28,7 +28,13 @@ from plugins.commands_downloads import (
     handle_download_book_callback,
     handle_start,
 )
-from EbookGuy.features.requests.commands import handle_requests
+from EbookGuy.features.requests.commands import (
+    handle_requests,
+    submit_selected_format,
+)
+from EbookGuy.features.requests.format_selection import (
+    handle_request_format_callback,
+)
 from EbookGuy.features.search.trending import handle_trending_command
 
 
@@ -121,6 +127,12 @@ async def requests(bot, message):
     if await enforce_subscription(bot, message):
         return
     await handle_requests(bot, message)
+
+
+@Client.on_callback_query(filters.regex(r"^request_format#"))
+@measure_callback("request_format")
+async def request_format_callback(bot, query):
+    await handle_request_format_callback(bot, query, submit_selected_format)
 
 
 @Client.on_message(filters.command("send") & filters.user(ADMINS))
