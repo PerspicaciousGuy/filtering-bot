@@ -9,7 +9,7 @@ health checks, secret handling, and rollback for EbookGuy Filtering Bot.
 - A Telegram bot token
 - MongoDB reachable from the deployment environment
 - At least one administrator Telegram user ID
-- A platform capable of running the Docker image or Python 3.10
+- A platform capable of running the Docker image or Python 3.11
 - Calibre when ebook conversion is enabled
 
 ## Required Environment Variables
@@ -69,7 +69,7 @@ Deleting the file from the latest commit does not remove it from older commits.
 Create an isolated environment and install the locked dependencies:
 
 ```powershell
-py -3.10 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --requirement requirements.lock
 Copy-Item .env.example .env
@@ -130,7 +130,7 @@ docker inspect --format '{{json .State.Health}}' filtering-bot
 
 The Docker image:
 
-- Uses Python 3.10
+- Uses Python 3.11
 - Installs dependencies from `requirements.lock`
 - Installs Calibre
 - Runs as a non-root user
@@ -171,7 +171,7 @@ Allow the platform enough termination grace time for this sequence.
 
 The quality job:
 
-- Installs `requirements.lock` on Python 3.10
+- Installs `requirements.lock` on Python 3.11
 - Runs `pip check`
 - Audits dependencies with `pip-audit`
 - Rejects tracked `.env` and `.session` files
