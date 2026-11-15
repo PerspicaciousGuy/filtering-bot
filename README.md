@@ -47,7 +47,7 @@ See [PAYMENTS.md](PAYMENTS.md) for the complete payment flow.
 
 ## Requirements
 
-- Python 3.10
+- Python 3.11
 - MongoDB
 - Telegram API credentials from `my.telegram.org`
 - A bot token from BotFather
@@ -93,7 +93,7 @@ overrides are stored in MongoDB and take precedence over environment defaults.
 ### Windows PowerShell
 
 ```powershell
-py -3.10 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --requirement requirements.lock
 Copy-Item .env.example .env
@@ -103,7 +103,7 @@ python bot.py
 ### Linux or macOS
 
 ```bash
-python3.10 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --requirement requirements.lock
 cp .env.example .env
@@ -116,7 +116,7 @@ The service is ready when `GET /ready` returns HTTP `200`.
 
 The production image:
 
-- Uses Python 3.10
+- Uses Python 3.11
 - Installs the exact versions in `requirements.lock`
 - Runs as a non-root user
 - Keeps the Telegram session in memory

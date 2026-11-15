@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.10.20-slim-bookworm AS dependencies
+FROM python:3.11.18-slim-bookworm AS dependencies
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
@@ -11,7 +11,7 @@ COPY requirements.lock /tmp/requirements.lock
 RUN pip install --no-cache-dir -r /tmp/requirements.lock
 
 
-FROM python:3.10.20-slim-bookworm AS production
+FROM python:3.11.18-slim-bookworm AS production
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
