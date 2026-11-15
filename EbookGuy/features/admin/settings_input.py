@@ -19,6 +19,7 @@ from EbookGuy.features.admin.settings_confirmation import (
 from EbookGuy.features.admin.settings_runtime_validation import (
     validate_runtime_setting,
 )
+from EbookGuy.shared.background_tasks import retain_task
 from EbookGuy.shared.global_settings import (
     get_global_settings,
     save_global_setting,
@@ -36,7 +37,6 @@ logger = logging.getLogger(__name__)
 INPUT_TIMEOUT_SECONDS = 120
 CONFIRMATION_DISPLAY_SECONDS = 3
 _active_admins: set[int] = set()
-_input_tasks: set[asyncio.Task] = set()
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ async def _delete_confirmation(message) -> None:
 async def _finish_input(prompt, reply, text: str) -> None:
     confirmation = await reply.reply_text(text)
     await _delete_messages((prompt, reply))
-    _retain_input_task(_delete_confirmation(confirmation))
+    retain_task(_delete_confirmation(confirmation))
 
 
 async def _apply_input(reply, prompt, context: SettingsInput) -> bool:
@@ -99,7 +99,7 @@ async def _apply_input(reply, prompt, context: SettingsInput) -> bool:
     except (KeyError, ValueError) as error:
         notice = await reply.reply_text(escape(str(error)))
         await _delete_messages((reply,))
-        _retain_input_task(_delete_confirmation(notice))
+        retain_task(_delete_confirmation(notice))
         return False
     if requires_setting_confirmation(context.key):
         settings = await get_global_settings()
@@ -153,17 +153,11 @@ async def _collect_input(client, context: SettingsInput) -> None:
             context.chat_id,
             "Settings update timed out. Open /settings to try again.",
         )
-        _retain_input_task(_delete_confirmation(notice))
+        retain_task(_delete_confirmation(notice))
     except (PyMongoError, RPCError):
         logger.exception("Failed to collect global settings input")
     finally:
         _active_admins.discard(context.admin_id)
-
-
-def _retain_input_task(coroutine) -> None:
-    task = asyncio.create_task(coroutine)
-    _input_tasks.add(task)
-    task.add_done_callback(_input_tasks.discard)
 
 
 async def start_setting_input(client, query, key: str) -> None:
@@ -190,7 +184,7 @@ async def start_setting_input(client, query, key: str) -> None:
     )
     await query.answer("Send the new value in this chat.")
     _active_admins.add(admin_id)
-    _retain_input_task(_collect_input(client, context))
+    retain_task(_collect_input(client, context))
 
 
 __all__ = ["is_settings_input_active", "start_setting_input"]

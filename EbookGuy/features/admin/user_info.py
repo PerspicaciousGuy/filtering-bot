@@ -3,21 +3,12 @@ import os
 
 from pyrogram import enums
 from pyrogram.errors import RPCError
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from EbookGuy.shared.markup import single_button_markup
 from utils import extract_user
 
 
 logger = logging.getLogger(__name__)
-
-
-def _close_markup():
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton(
-            "\U0001f510 Close",
-            callback_data="close_data",
-        )
-    ]])
 
 
 def _user_info_text(user):
@@ -37,7 +28,7 @@ def _user_info_text(user):
 
 async def _send_user_info(client, message, user):
     text = _user_info_text(user)
-    reply_markup = _close_markup()
+    reply_markup = single_button_markup("\U0001f510 Close", "close_data")
     if not user.photo:
         await message.reply_text(
             text=text,

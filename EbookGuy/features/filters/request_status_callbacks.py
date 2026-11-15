@@ -1,6 +1,5 @@
 """Administrator and requester callbacks for book-request statuses."""
 
-import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import escape
@@ -21,13 +20,13 @@ from EbookGuy.features.requests.notifications import (
     notify_requester,
 )
 from EbookGuy.shared.analytics import track_event
+from EbookGuy.shared.background_tasks import retain_task
 from EbookGuy.shared.global_settings import get_global_settings
-from info import ADMINS
+from EbookGuy.shared.permissions import is_bot_admin
 
 
 ACCESS_DENIED_MESSAGE = "Only bot administrators can change request status."
 logger = logging.getLogger(__name__)
-_notification_tasks: set[asyncio.Task] = set()
 
 
 @dataclass(frozen=True)
@@ -37,13 +36,6 @@ class StatusChange:
     query: object
     status: RequestStatusDefinition
     token: str
-
-
-def _is_bot_admin(user) -> bool:
-    identifiers = {str(admin).lower() for admin in ADMINS}
-    user_id = str(getattr(user, "id", ""))
-    username = str(getattr(user, "username", "")).lower()
-    return user_id in identifiers or username in identifiers
 
 
 def _parse_request_token(token: str) -> tuple[str | None, int]:
@@ -169,12 +161,6 @@ async def _apply_status_change(
         logger.exception("Failed to apply request status change")
 
 
-def _retain_task(coroutine) -> None:
-    task = asyncio.create_task(coroutine)
-    _notification_tasks.add(task)
-    task.add_done_callback(_notification_tasks.discard)
-
-
 async def _show_requester_alert(query, status, user_id: str) -> None:
     if int(query.from_user.id) != int(user_id):
         await query.answer("This request does not belong to you.", show_alert=True)
@@ -189,7 +175,7 @@ async def maybe_handle_request_status_callback(client, query) -> bool:
         return False
 
     if action in {"show_option", "request_options"}:
-        if not _is_bot_admin(query.from_user):
+        if not is_bot_admin(query.from_user):
             await query.answer(ACCESS_DENIED_MESSAGE, show_alert=True)
             return True
         try:
@@ -198,12 +184,12 @@ async def maybe_handle_request_status_callback(client, query) -> bool:
             await query.answer("Invalid request.", show_alert=True)
             return True
         await query.answer("Choose the new request status")
-        _retain_task(_show_status_options(query, token))
+        retain_task(_show_status_options(query, token))
         return True
 
     status = STATUS_ACTIONS.get(action)
     if status is not None:
-        if not _is_bot_admin(query.from_user):
+        if not is_bot_admin(query.from_user):
             await query.answer(ACCESS_DENIED_MESSAGE, show_alert=True)
             return True
         try:
@@ -212,7 +198,7 @@ async def maybe_handle_request_status_callback(client, query) -> bool:
             await query.answer("Invalid request.", show_alert=True)
             return True
         await query.answer(status.confirmation)
-        _retain_task(
+        retain_task(
             _apply_status_change(
                 client,
                 StatusChange(query=query, status=status, token=token),

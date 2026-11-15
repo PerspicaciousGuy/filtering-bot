@@ -4,6 +4,7 @@ from pyrogram import enums
 from pyrogram.errors import RPCError
 
 from EbookGuy.shared.global_settings import get_global_settings
+from EbookGuy.shared.settings_catalog import PAYMENT_SETTING_KEYS
 
 
 CHANNEL_SETTINGS = {
@@ -15,17 +16,7 @@ CHANNEL_SETTINGS = {
     "required_subscription_channels",
     "support_chat_id",
 }
-PAYMENT_SETTINGS = {
-    "upi_payments_enabled",
-    "upi_id",
-    "upi_payee_name",
-    "binance_payments_enabled",
-    "binance_pay_id",
-    "binance_pay_url_30",
-    "binance_pay_url_90",
-    "binance_30_days_usd_cents",
-    "binance_90_days_usd_cents",
-}
+PAYMENT_SETTINGS = frozenset(PAYMENT_SETTING_KEYS)
 
 
 async def _validate_configured_channels(
