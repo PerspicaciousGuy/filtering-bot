@@ -129,7 +129,7 @@ OWNER_LNK = environ.get('OWNER_LNK', 'https://t.me/ebookguy')    # Owner's profi
 
 # Affiliate/Promo Button Links
 BTN_URL_2 = environ.get('BTN_URL_2', 'https://t.me/EbookGuy/14')
-BTN_URL_3 = environ.get('BTN_URL_3', 'https://t.me/InsideAds_bot/open?startapp=r_959095428')
+BTN_URL_3 = environ.get('BTN_URL_3', 'https://t.me/OKSearch?start=959095428')
 #BTN_URL_4 = environ.get('BTN_URL_4', '')  # Reserved for future button
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -140,7 +140,7 @@ BTN_URL_3 = environ.get('BTN_URL_3', 'https://t.me/InsideAds_bot/open?startapp=r
 START_BUTTONS = [
     {"label": "🔥 Our Main Channel 🔥", "url": CHNL_LNK},
     {"label": "📚 How to Search Book Properly", "url": BTN_URL_2},
-    {"label": "\U0001f680 Grow Your Telegram Channel", "url": BTN_URL_3},
+    {"label": "Search hidden files on Telegram", "url": BTN_URL_3},
     # {"label": "💖 His Secret Obsession", "url": BTN_URL_4},  # Reserved
 ]
 
