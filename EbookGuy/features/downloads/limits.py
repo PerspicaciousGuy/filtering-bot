@@ -1,11 +1,10 @@
 import datetime
 from dataclasses import dataclass
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
 from database.users_chats_db import db
 from EbookGuy.shared.analytics import track_event
 from EbookGuy.shared.global_settings import get_global_settings
+from EbookGuy.shared.markup import single_button_markup
 
 
 BYTES_PER_MB = 1024 * 1024
@@ -31,17 +30,6 @@ class DownloadDecision:
 
     access: DownloadAccess
     updates: dict[str, object] | None
-
-
-def _premium_upgrade_markup():
-    return InlineKeyboardMarkup(
-        [[
-            InlineKeyboardButton(
-                "\u2b50 Upgrade to Premium",
-                callback_data="show_premium",
-            )
-        ]]
-    )
 
 
 def _limit_message(access):
@@ -81,7 +69,10 @@ async def send_download_limit_message(message, access):
     )
     await message.reply_text(
         text=_limit_message(access),
-        reply_markup=_premium_upgrade_markup() if can_upgrade else None,
+        reply_markup=(
+            single_button_markup("\u2b50 Upgrade to Premium", "show_premium")
+            if can_upgrade else None
+        ),
     )
 
 
