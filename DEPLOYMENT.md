@@ -41,8 +41,12 @@ Start from `.env.example` for the complete optional configuration.
 - Do not place secrets in Docker build arguments or image layers.
 - Rotate credentials immediately if they appear in Git history or logs.
 
-The bot uses an in-memory Pyrogram session. A local `EbookGuyBot.session` file
-should not be created during normal startup.
+The bot stores its Pyrogram session in a file named by the `SESSION` variable.
+The Docker image sets `SESSION=/tmp/EbookGuyBot` because the application
+directory is not writable by the non-root user. Without a volume, the session
+is lost on redeploy and the bot logs in again with its token. Outside Docker,
+the default `EbookGuyBot` creates `EbookGuyBot.session` in the working
+directory; keep that file out of Git.
 
 ## Credential Remediation Before Deployment
 
@@ -134,6 +138,7 @@ The Docker image:
 - Installs dependencies from `requirements.lock`
 - Installs Calibre
 - Runs as a non-root user
+- Stores the Telegram session at `/tmp/EbookGuyBot.session` unless `SESSION` is set
 - Excludes local credentials, sessions, logs, caches, and agent files
 - Checks `/ready` every 30 seconds
 

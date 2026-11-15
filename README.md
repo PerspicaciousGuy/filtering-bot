@@ -119,7 +119,7 @@ The production image:
 - Uses Python 3.11
 - Installs the exact versions in `requirements.lock`
 - Runs as a non-root user
-- Keeps the Telegram session in memory
+- Stores the Telegram session in `/tmp` by default (`SESSION=/tmp/EbookGuyBot`), so it is not kept across redeploys and the bot logs in again with its token
 - Exposes liveness and readiness endpoints
 - Stops background tasks and Telegram clients during shutdown
 
