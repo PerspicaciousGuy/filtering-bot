@@ -18,6 +18,10 @@ ENV PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:${PATH}"
 
+# Pyrogram writes its session file here by default. /app is owned by root, so
+# the non-root app user cannot create files in it. Override with SESSION.
+ENV SESSION=/tmp/EbookGuyBot
+
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends calibre \
     && rm -rf /var/lib/apt/lists/*
