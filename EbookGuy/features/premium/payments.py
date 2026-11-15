@@ -279,12 +279,12 @@ async def handle_pre_checkout_handler(client, query: PreCheckoutQuery):
             and query.total_amount == expected_price
         )
         await query.answer(
-            ok=is_valid,
-            error_message=None if is_valid else "Invalid payment request",
+            success=is_valid,
+            error=None if is_valid else "Invalid payment request",
         )
     except (KeyError, PyMongoError, RPCError, TypeError, ValueError):
         logger.exception("Failed during Telegram Stars pre-checkout")
-        await query.answer(ok=False, error_message="Payment verification failed")
+        await query.answer(error="Payment verification failed")
 
 def _validate_successful_payment(payment, purchase, user_id):
     expected_stars = purchase.stars
