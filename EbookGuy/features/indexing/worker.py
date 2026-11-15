@@ -21,10 +21,10 @@ from EbookGuy.features.indexing.progress import (
     completion_text,
     failure_text,
     format_progress,
-    pause_markup,
     paused_text,
     rate_limit_text,
 )
+from EbookGuy.shared.markup import single_button_markup
 from info import FILTER_BY_EXTENSION
 from utils import temp
 
@@ -69,7 +69,7 @@ async def _update_progress(request, state):
     try:
         await request.status_message.edit_text(
             format_progress(state.current_message, state.stats),
-            reply_markup=pause_markup(),
+            reply_markup=single_button_markup("\u23f8\ufe0f Pause", "index_cancel"),
         )
     except MessageNotModified:
         logger.debug("Indexing progress message is already current")

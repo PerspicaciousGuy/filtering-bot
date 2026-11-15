@@ -2,20 +2,13 @@
 
 from html import escape
 
-from info import ADMINS
 from EbookGuy.shared.global_settings import get_global_settings
-
-
-def _is_admin(user) -> bool:
-    identifiers = {str(admin).lower() for admin in ADMINS}
-    user_id = str(getattr(user, "id", ""))
-    username = str(getattr(user, "username", "")).lower()
-    return user_id in identifiers or username in identifiers
+from EbookGuy.shared.permissions import is_bot_admin
 
 
 async def get_maintenance_message(user) -> str | None:
     """Return the maintenance notice for a restricted user update."""
-    if _is_admin(user):
+    if is_bot_admin(user):
         return None
     settings = await get_global_settings()
     if not settings["maintenance_mode"]:

@@ -1,15 +1,4 @@
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
 from info import FILTER_BY_EXTENSION
-
-
-def pause_markup():
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton(
-            "\u23f8\ufe0f Pause",
-            callback_data="index_cancel",
-        )
-    ]])
 
 
 def format_progress(current, stats, paused=False):

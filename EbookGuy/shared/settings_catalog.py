@@ -83,6 +83,18 @@ SETTING_LABELS = {
     "support_url": "Support URL",
 }
 
+PAYMENT_SETTING_KEYS = (
+    "upi_payments_enabled",
+    "upi_id",
+    "upi_payee_name",
+    "binance_payments_enabled",
+    "binance_pay_id",
+    "binance_pay_url_30",
+    "binance_pay_url_90",
+    "binance_30_days_usd_cents",
+    "binance_90_days_usd_cents",
+)
+
 CATEGORY_SETTINGS = {
     "usage": (
         "free_daily_limit",
@@ -147,17 +159,7 @@ CATEGORY_SETTINGS = {
         "premium_90_days_inr",
         "premium_expiry_notifications_enabled",
     ),
-    "payments": (
-        "upi_payments_enabled",
-        "upi_id",
-        "upi_payee_name",
-        "binance_payments_enabled",
-        "binance_pay_id",
-        "binance_pay_url_30",
-        "binance_pay_url_90",
-        "binance_30_days_usd_cents",
-        "binance_90_days_usd_cents",
-    ),
+    "payments": PAYMENT_SETTING_KEYS,
     "operations": (
         "maintenance_mode",
         "maintenance_message",

@@ -48,17 +48,10 @@ from EbookGuy.shared.settings_schema import (
     is_editable_setting,
     is_known_setting,
 )
-from info import ADMINS
+from EbookGuy.shared.permissions import is_bot_admin
 
 logger = logging.getLogger(__name__)
 ACCESS_DENIED_MESSAGE = "Only bot admins can use these settings."
-
-
-def _is_bot_admin(user) -> bool:
-    identifiers = {str(admin).lower() for admin in ADMINS}
-    user_id = str(getattr(user, "id", ""))
-    username = str(getattr(user, "username", "")).lower()
-    return user_id in identifiers or username in identifiers
 
 
 async def _show_category(query, category: str) -> None:
@@ -187,7 +180,7 @@ async def _route_settings_callback(client, query) -> None:
 
 async def handle_settings_callback(client, query) -> None:
     """Handle an admin settings navigation callback."""
-    if not _is_bot_admin(query.from_user):
+    if not is_bot_admin(query.from_user):
         await query.answer(ACCESS_DENIED_MESSAGE, show_alert=True)
         return
 
