@@ -197,7 +197,7 @@ async def maybe_handle_request_status_callback(client, query) -> bool:
         except ValueError:
             await query.answer("Invalid request.", show_alert=True)
             return True
-        await query.answer(status.confirmation)
+        await query.answer()
         retain_task(
             _apply_status_change(
                 client,
