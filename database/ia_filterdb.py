@@ -8,11 +8,7 @@ from pyrogram.file_id import FileId
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from database.file_collections import active_file_collections, col, sec_col
 from database import indexing_checkpoints as checkpoint_store
-from database.search_repository import (
-    SearchRequest,
-    clear_search_cache,
-    get_search_results,
-)
+from database.search_repository import clear_search_cache
 from info import (
     ALLOWED_EXTENSIONS,
     FILTER_BY_EXTENSION,
@@ -125,7 +121,7 @@ async def is_file_already_saved(file_id, file_name):
             
     return False
 
-async def get_bad_files(query, file_type=None, use_filter=False):
+async def get_bad_files(query, file_type=None):
     """For given query return (results, next_offset)"""
     query = query.strip()
     

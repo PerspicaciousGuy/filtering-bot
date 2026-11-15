@@ -56,9 +56,3 @@ class JoinReqs:
 
     async def delete_user(self, user_id):
         await self.col.delete_one({"user_id": int(user_id)})
-
-    async def delete_all_users(self):
-        await self.col.delete_many({})
-
-    async def get_all_users_count(self):
-        return await self.col.count_documents({})

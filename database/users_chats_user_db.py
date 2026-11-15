@@ -31,20 +31,6 @@ class UserRecordsMixin:
         count = await self.col.count_documents({})
         return count
 
-    async def remove_ban(self, id):
-        ban_status = dict(
-            is_banned=False,
-            ban_reason=''
-        )
-        await self.col.update_one({'id': id}, {'$set': {'ban_status': ban_status}})
-
-    async def ban_user(self, user_id, ban_reason="No Reason"):
-        ban_status = dict(
-            is_banned=True,
-            ban_reason=ban_reason
-        )
-        await self.col.update_one({'id': user_id}, {'$set': {'ban_status': ban_status}})
-
     async def get_ban_status(self, id):
         default = dict(
             is_banned=False,
@@ -68,34 +54,3 @@ class UserRecordsMixin:
     async def get_user(self, user_id):
         user_data = await self.users.find_one({"id": user_id})
         return user_data
-
-    async def update_user(self, user_data):
-        await self.users.update_one({"id": user_data["id"]}, {"$set": user_data}, upsert=True)
-
-    async def set_thumbnail(self, id, file_id):
-        await self.col.update_one({'id': int(id)}, {'$set': {'file_id': file_id}})
-
-    async def get_thumbnail(self, id):
-        user = await self.col.find_one({'id': int(id)})
-        return (user or {}).get('file_id')
-
-    async def set_caption(self, id, caption):
-        await self.col.update_one({'id': int(id)}, {'$set': {'caption': caption}})
-
-    async def get_caption(self, id):
-        user = await self.col.find_one({'id': int(id)})
-        return (user or {}).get('caption')
-
-    async def set_msg_command(self, id, com):
-        await self.col.update_one({'id': int(id)}, {'$set': {'message_command': com}})
-
-    async def get_msg_command(self, id):
-        user = await self.col.find_one({'id': int(id)})
-        return (user or {}).get('message_command')
-
-    async def set_save(self, id, save):
-        await self.col.update_one({'id': int(id)}, {'$set': {'save': save}})
-
-    async def get_save(self, id):
-        user = await self.col.find_one({'id': int(id)})
-        return (user or {}).get('save', False)

@@ -5,7 +5,6 @@ from pyrogram import Client
 from pyrogram.types import Message
 
 from info import API_HASH, API_ID, BOT_TOKEN, BOT_WORKERS, SESSION
-from utils import temp
 
 
 @dataclass(frozen=True)
@@ -28,9 +27,6 @@ class EbookGuyXBot(Client):
             sleep_threshold=5,
         )
 
-    async def set_self(self):
-        temp.BOT = self
-    
     async def iter_messages(
         self,
         request: MessageRange,

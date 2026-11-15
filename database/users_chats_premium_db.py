@@ -135,46 +135,6 @@ class PremiumUsageMixin:
         
         return user.get('daily_downloads', 0)
 
-    async def get_user_last_download_time(self, user_id):
-        """Get user's last download timestamp (for rate limiting)"""
-        user = await self.col.find_one({'id': int(user_id)})
-        if not user:
-            return None
-        return user.get('last_download_time', None)
-
-    async def set_user_last_download_time(self, user_id):
-        """Update user's last download timestamp"""
-        await self.col.update_one(
-            {'id': int(user_id)},
-            {'$set': {'last_download_time': datetime.datetime.now()}}
-        )
-
-    async def increment_downloads(self, user_id):
-        """Increment download count for today"""
-        today = str(datetime.date.today())
-        user = await self.col.find_one({'id': int(user_id)})
-        
-        if not user:
-            return 1
-        
-        last_download_date = user.get('last_download_date', None)
-        
-        if last_download_date != today:
-            # New day, reset to 1
-            await self.col.update_one(
-                {'id': int(user_id)},
-                {'$set': {'daily_downloads': 1, 'last_download_date': today}}
-            )
-            return 1
-        else:
-            # Same day, increment
-            new_count = user.get('daily_downloads', 0) + 1
-            await self.col.update_one(
-                {'id': int(user_id)},
-                {'$set': {'daily_downloads': new_count}}
-            )
-            return new_count
-
     async def get_remaining_conversions(self, user_id, daily_limit):
         """Get remaining conversions for the configured daily limit."""
         if daily_limit == 0:

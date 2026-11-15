@@ -67,10 +67,7 @@ async def web_server():
 async def _initialize_bot_state():
     temp.BANNED_USERS = await db.get_banned()
     identity = await EbookGuyBot.get_me()
-    temp.BOT = EbookGuyBot
-    temp.ME = identity.id
     temp.U_NAME = identity.username
-    temp.B_NAME = identity.first_name
 
 
 async def _refresh_library_count():

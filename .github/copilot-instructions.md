@@ -46,7 +46,6 @@
 ### 5. Utility Modules (`EbookGuy/util/`)
 - **`config_parser.py`**: Parses environment variables for multi-client bot tokens (via `TokenParser`)
 - **`file_properties.py`**: Gets file name, hash, and size from Telegram documents
-- **`human_readable.py`**: Formats file sizes for display (e.g., "1.5 MB")
 - **`render_template.py`**: Jinja2 template rendering for web (uses `template/` HTML files)
 - **`keepalive.py`**: Pings web server to keep bot alive on Heroku
 
