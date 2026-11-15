@@ -1,7 +1,10 @@
+import inspect
 import os
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+
+from pyrogram.types import PreCheckoutQuery
 
 REQUIRED_TEST_ENVIRONMENT = {
     "API_ID": "123456",
@@ -91,8 +94,8 @@ class PreCheckoutTests(unittest.IsolatedAsyncioTestCase):
             await payments.handle_pre_checkout_handler(None, query)
 
         query.answer.assert_awaited_once_with(
-            ok=True,
-            error_message=None,
+            success=True,
+            error=None,
         )
 
     async def test_rejects_changed_stars_amount(self):
@@ -119,9 +122,37 @@ class PreCheckoutTests(unittest.IsolatedAsyncioTestCase):
             await payments.handle_pre_checkout_handler(None, query)
 
         query.answer.assert_awaited_once_with(
-            ok=False,
-            error_message="Invalid payment request",
+            success=False,
+            error="Invalid payment request",
         )
+
+    async def test_answer_arguments_match_pyrofork_signature(self):
+        """The handler's keywords must be accepted by the real PreCheckoutQuery.answer."""
+        real_signature = inspect.signature(PreCheckoutQuery.answer)
+        query = SimpleNamespace(
+            invoice_payload="premium_30_123456789_100",
+            from_user=SimpleNamespace(id=123456789),
+            currency="XTR",
+            total_amount=100,
+            answer=AsyncMock(),
+        )
+        settings = {
+            "premium_purchases_enabled": True,
+            "stars_payments_enabled": True,
+        }
+
+        with (
+            patch.object(
+                payments,
+                "get_global_settings",
+                AsyncMock(return_value=settings),
+            ),
+            patch.object(payments, "get_stars_price", return_value=100),
+        ):
+            await payments.handle_pre_checkout_handler(None, query)
+
+        sent_keywords = query.answer.await_args.kwargs
+        real_signature.bind(None, **sent_keywords)
 
 
 if __name__ == "__main__":
