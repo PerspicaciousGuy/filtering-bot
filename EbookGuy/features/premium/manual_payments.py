@@ -16,6 +16,7 @@ from EbookGuy.shared.global_settings import get_global_settings
 logger = logging.getLogger(__name__)
 
 MANUAL_PROVIDERS = ("upi", "binance")
+COPY_TEXT_MAX_LENGTH = 256  # Bot API CopyTextButton.text limit
 
 
 def _payment_text(details: ManualPaymentDetails, direct_link_failed=False) -> str:
@@ -48,6 +49,15 @@ def _payment_markup(
                 InlineKeyboardButton(
                     f"Pay {details.amount_label}",
                     url=details.payment_url,
+                )
+            ]
+        )
+    if 1 <= len(details.copy_value) <= COPY_TEXT_MAX_LENGTH:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    f"Copy {details.destination_label}",
+                    copy_text=details.copy_value,
                 )
             ]
         )

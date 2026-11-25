@@ -15,6 +15,7 @@ from EbookGuy.features.premium.manual_payment_options import (
     manual_payment_method_buttons,
     manual_payment_method_names,
 )
+from EbookGuy.features.premium.message_effects import reply_with_celebration
 from EbookGuy.features.premium.plans import (
     PLAN_DAYS,
     get_inr_price,
@@ -353,7 +354,7 @@ async def handle_successful_payment_handler(client, message):
             activation,
             describe_daily_limit(settings["premium_daily_limit"]),
         )
-        await message.reply_text(text)
+        await reply_with_celebration(client, message, text)
         logger.info(
             "Premium payment fulfilled: user=%s days=%s newly_applied=%s",
             user_id,

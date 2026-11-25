@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import quote_plus
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -5,6 +6,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from Script import script
 from EbookGuy.features.search.expiry import SearchExpiry, schedule_search_expiry
 from EbookGuy.features.search.pagination import (
+    NO_MORE_PAGES_TEXT,
     PaginationState,
     build_file_buttons,
     build_pagination_row,
@@ -12,8 +14,16 @@ from EbookGuy.features.search.pagination import (
     normalize_offset,
 )
 from EbookGuy.features.search.state import FRESH, PENDING_SEARCH
+from EbookGuy.shared.bot_api import (
+    BotApiError,
+    call_bot_api,
+    disabled_button_payload,
+    inline_button_payload,
+)
 from info import BUTTON_MODE
 from utils import get_cap, temp
+
+logger = logging.getLogger(__name__)
 
 
 def _store_pending_search(request, key):
@@ -110,6 +120,46 @@ def _result_caption(outcome, prefix):
     )
 
 
+def _disabled_last_page_keyboard(buttons):
+    """Return Bot API rows with a disabled "No More Pages" button, or None."""
+    last_row = buttons[-1] if buttons else []
+    if len(last_row) != 1 or last_row[0].text != NO_MORE_PAGES_TEXT:
+        return None
+    rows = []
+    for row in buttons[:-1]:
+        payload_row = [inline_button_payload(button) for button in row]
+        if None in payload_row:
+            return None
+        rows.append(payload_row)
+    rows.append([disabled_button_payload(NO_MORE_PAGES_TEXT)])
+    return rows
+
+
+async def _edit_with_disabled_last_page(result_message, text, buttons):
+    """Show single-page results with a disabled button via the Bot API.
+
+    Pyrofork cannot send disabled buttons (Bot API 10.3), so this one edit
+    goes through the Bot API. Returns False when the caller should fall back
+    to the normal Pyrogram edit.
+    """
+    keyboard = _disabled_last_page_keyboard(buttons)
+    if keyboard is None:
+        return False
+    try:
+        await call_bot_api("editMessageText", {
+            "chat_id": result_message.chat.id,
+            "message_id": result_message.id,
+            "text": text,
+            "parse_mode": "HTML",
+            "link_preview_options": {"is_disabled": True},
+            "reply_markup": {"inline_keyboard": keyboard},
+        })
+    except BotApiError as error:
+        logger.info("Falling back to a normal results edit: %s", error)
+        return False
+    return True
+
+
 async def show_search_results(request, outcome):
     message = request.message
     key = f"{message.chat.id}-{message.id}"
@@ -117,11 +167,14 @@ async def show_search_results(request, outcome):
     temp.GETALL[key] = outcome.files
     buttons, prefix, requester_id = await _initial_buttons(request, outcome, key)
     temp.SHORT[requester_id] = message.chat.id
-    result_message = await request.reply_message.edit_text(
-        text=_result_caption(outcome, prefix),
-        reply_markup=InlineKeyboardMarkup(buttons),
-        disable_web_page_preview=True,
-    )
+    text = _result_caption(outcome, prefix)
+    result_message = request.reply_message
+    if not await _edit_with_disabled_last_page(result_message, text, buttons):
+        result_message = await result_message.edit_text(
+            text=text,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            disable_web_page_preview=True,
+        )
     schedule_search_expiry(SearchExpiry(
         key=key,
         delay_seconds=int(outcome.settings["search_result_expiry_seconds"]),
