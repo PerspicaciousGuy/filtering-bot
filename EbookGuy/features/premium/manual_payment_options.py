@@ -19,6 +19,7 @@ class ManualPaymentDetails:
     destination_label: str
     destination_value: str
     payment_url: str
+    copy_value: str = ""
 
 
 def is_http_url(value: str) -> bool:
@@ -123,6 +124,7 @@ def get_manual_payment_details(
             destination_label="UPI ID",
             destination_value=str(settings["upi_id"]),
             payment_url=payment_url,
+            copy_value=str(settings["upi_id"]),
         )
 
     payment_url = _binance_payment_url(days, settings)
@@ -141,6 +143,7 @@ def get_manual_payment_details(
             str(settings["binance_pay_id"]) or "Open the payment link"
         ),
         payment_url=payment_url,
+        copy_value=str(settings["binance_pay_id"]),
     )
 
 

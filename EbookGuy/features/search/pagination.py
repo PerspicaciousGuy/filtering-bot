@@ -5,6 +5,8 @@ from pyrogram.types import InlineKeyboardButton
 
 from utils import get_size
 
+NO_MORE_PAGES_TEXT = "No More Pages Available"
+
 
 @dataclass(frozen=True)
 class PaginationState:
@@ -58,7 +60,7 @@ def build_pagination_row(state, is_initial=False):
         if state.next_offset == 0:
             return [
                 InlineKeyboardButton(
-                    "No More Pages Available",
+                    NO_MORE_PAGES_TEXT,
                     callback_data="pages",
                 )
             ]
